@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
+import { aiService } from '../services/aiService';
 
 export const useAssistant = ({ windowType = 'single', isElectron = false } = {}) => {
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [interactionCount, setInteractionCount] = useState(0);
-  const [micStatus, setMicStatus] = useState(false); // New: Microphone status
+  const [micStatus, setMicStatus] = useState(false); 
   const [screenStatus, setScreenStatus] = useState(false);
-  const [viewMode, setViewMode] = useState('collapsed'); // 'collapsed' | 'context' | 'settings'
-  const [mockData, setMockData] = useState({ query: '', answer: '', citations: [] });
+  const [viewMode, setViewMode] = useState('collapsed');
+  const [mockData, setMockData] = useState({ query: '', answer: '', sections: [], citations: [] });
   const inputRef = useRef(null);
 
-  // Settings State
   const [selectedProvider, setSelectedProvider] = useState('gemini');
   const [activePlugins, setActivePlugins] = useState([
     { id: 'gcal', name: 'Google Calendar', active: true },
@@ -18,14 +18,11 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
     { id: 'notion', name: 'Notion', active: true },
   ]);
 
-  // Handle Window Resizing based on ViewMode
   useEffect(() => {
     if (!isElectron || windowType !== 'search') return;
 
-    // Definir tamanhos para cada modo
-    // Base width: 600px (definido no main.js padrão)
-    const COLLAPSED_HEIGHT = 180; // Apenas barra
-    const EXPANDED_HEIGHT = 600;  // Com overlay/settings
+    const COLLAPSED_HEIGHT = 180; 
+    const EXPANDED_HEIGHT = 600;  
 
     if (window.electronAPI && window.electronAPI.resizeWindow) {
       if (viewMode === 'collapsed') {
@@ -37,16 +34,13 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
   }, [viewMode, windowType, isElectron]);
 
   useEffect(() => {
-    // Focar no input quando o hook é inicializado
     if (inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
 
-  // Simular detecção de atividade do microfone
   useEffect(() => {
     const interval = setInterval(() => {
-      // Randomly toggle mic activity for demo
       if (Math.random() > 0.8) setMicStatus(prev => !prev);
     }, 3000);
     return () => clearInterval(interval);
@@ -61,7 +55,6 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
       e.preventDefault();
       handleSubmit();
     }
-    // Escape to close/collapse
     if (e.key === 'Escape') {
       if (viewMode !== 'collapsed') {
          setViewMode('collapsed');
@@ -75,29 +68,35 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
     setIsProcessing(true);
     setInteractionCount(prev => prev + 1);
 
-    // Simular processamento da IA
-    setTimeout(() => {
-      const payload = {
+    try {
+      const response = await aiService.ask(inputValue);
+      
+      // A resposta agora é um objeto estruturado { answer, sections, citations }
+      setMockData({
         query: inputValue,
-        answer: "Com base na reunião das 10h, o cronograma foi ajustado para incluir a fase de testes na próxima terça-feira. \n\nO time concordou que a integração do backend deve ser priorizada antes da UI final.",
-        citations: [
-          { id: 1, timestamp: "10:32:15", snippet: "Discussão sobre cronograma", img: null },
-          { id: 2, timestamp: "10:45:00", snippet: "Acordo sobre Backend", img: null },
-        ]
-      };
-
-      setIsProcessing(false);
-      setMockData(payload);
+        answer: response.answer || response,
+        sections: response.sections || [],
+        citations: response.citations || []
+      });
 
       if (isElectron && window.electronAPI?.openWindow) {
-        window.electronAPI.openWindow('context', payload);
+        window.electronAPI.openWindow('context', {
+          query: inputValue,
+          answer: response.answer || response,
+          sections: response.sections || [],
+          citations: response.citations || []
+        });
         setViewMode('collapsed');
       } else {
-        setViewMode('context'); // Expand to show results
+        setViewMode('context'); 
       }
-
+    } catch (error) {
+      console.error("Failed to get AI response:", error);
+      // Optional: set error state to show in UI
+    } finally {
+      setIsProcessing(false);
       setInputValue('');
-    }, 2000);
+    }
   };
 
   const copyToClipboard = async () => {
@@ -139,7 +138,6 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
   }
 
   return {
-    // State
     inputValue,
     isProcessing,
     interactionCount,
@@ -154,7 +152,6 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
         cpuLoad: 34
     },
 
-    // Handlers
     handleInputChange,
     handleKeyDown,
     handleSubmit,
@@ -165,7 +162,6 @@ export const useAssistant = ({ windowType = 'single', isElectron = false } = {})
     quickAction,
     toggleScreenVision,
     
-    // Settings Handlers
     setSelectedProvider,
     togglePlugin
   };

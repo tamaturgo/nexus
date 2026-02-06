@@ -27,6 +27,7 @@ function App() {
   const [contextData, setContextData] = useState({
     query: '',
     answer: '',
+    sections: [],
     citations: []
   });
 
@@ -89,12 +90,18 @@ function App() {
   }, []);
 
   if (windowType === 'context') {
+    // Ensure answer is a string before passing to ContextOverlay
+    const finalAnswer = typeof contextData.answer === 'string' 
+      ? contextData.answer 
+      : (contextData.answer?.answer || JSON.stringify(contextData.answer || ""));
+
     return (
       <MainContainer isFocused={true}>
         <ContextOverlay
           query={contextData.query}
-          answer={contextData.answer}
-          citations={contextData.citations}
+          answer={finalAnswer}
+          sections={contextData.sections || []}
+          citations={contextData.citations || []}
           onClose={handleCloseWindow}
           onMinimize={handleMinimizeWindow}
         />
@@ -154,6 +161,7 @@ function App() {
             <ContextOverlay
               query={mockData.query}
               answer={mockData.answer}
+              sections={mockData.sections || []}
               citations={mockData.citations}
             />
           )}

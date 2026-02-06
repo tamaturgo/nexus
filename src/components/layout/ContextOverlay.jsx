@@ -1,11 +1,165 @@
 import PropTypes from 'prop-types';
-import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus } from 'react-icons/fi';
-import ActionButton from '../common/ActionButton';
+import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus, FiList, FiCode, FiFileText } from 'react-icons/fi';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-const ContextOverlay = ({ query, answer, citations, onClose, onMinimize }) => {
+// Componente customizado para renderizar markdown com estilos do tema
+const MarkdownRenderer = ({ content }) => {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // Headers
+        h1: ({ children }) => (
+          <h1 className="text-lg font-bold text-gray-200 mb-3 mt-4 first:mt-0">{children}</h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-base font-semibold text-gray-200 mb-2 mt-3">{children}</h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-semibold text-gray-200 mb-2 mt-3">{children}</h3>
+        ),
+        h4: ({ children }) => (
+          <h4 className="text-sm font-medium text-gray-300 mb-1 mt-2">{children}</h4>
+        ),
+
+        // Parágrafos
+        p: ({ children }) => (
+          <p className="text-sm text-gray-300 leading-relaxed mb-3 last:mb-0">{children}</p>
+        ),
+
+        // Listas
+        ul: ({ children }) => (
+          <ul className="text-sm text-gray-300 leading-relaxed mb-3 space-y-1">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="text-sm text-gray-300 leading-relaxed mb-3 space-y-1">{children}</ol>
+        ),
+        li: ({ children }) => (
+          <li className="flex items-start gap-2">
+            <span className="text-purple-400 mt-1.5 text-xs">•</span>
+            <span className="flex-1">{children}</span>
+          </li>
+        ),
+
+        // Código inline
+        code: ({ inline, children }) => {
+          if (inline) {
+            return (
+              <code className="bg-gray-800 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                {children}
+              </code>
+            );
+          }
+          return (
+            <code className="block bg-gray-800 text-gray-200 p-3 rounded-md text-xs font-mono overflow-x-auto">
+              {children}
+            </code>
+          );
+        },
+
+        // Blocos de código
+        pre: ({ children }) => (
+          <pre className="bg-gray-800 text-gray-200 p-3 rounded-md text-xs font-mono overflow-x-auto mb-3">
+            {children}
+          </pre>
+        ),
+
+        // Links
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            className="text-purple-400 hover:text-purple-300 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {children}
+          </a>
+        ),
+
+        // Ênfase
+        strong: ({ children }) => (
+          <strong className="font-semibold text-gray-200">{children}</strong>
+        ),
+        em: ({ children }) => (
+          <em className="italic text-gray-300">{children}</em>
+        ),
+
+        // Citações
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-4 border-purple-500/50 pl-4 py-2 my-3 bg-purple-500/5 rounded-r-md">
+            <div className="text-sm text-gray-400 italic">{children}</div>
+          </blockquote>
+        ),
+
+        // Tabelas
+        table: ({ children }) => (
+          <div className="overflow-x-auto mb-3">
+            <table className="min-w-full text-sm text-gray-300 border-collapse border border-gray-700">
+              {children}
+            </table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead className="bg-gray-800">{children}</thead>
+        ),
+        tbody: ({ children }) => (
+          <tbody className="divide-y divide-gray-700">{children}</tbody>
+        ),
+        tr: ({ children }) => (
+          <tr className="hover:bg-gray-800/50">{children}</tr>
+        ),
+        th: ({ children }) => (
+          <th className="px-3 py-2 text-left font-semibold text-gray-200 border border-gray-700">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 border border-gray-700">{children}</td>
+        ),
+
+        // Linha horizontal
+        hr: () => (
+          <hr className="border-gray-700 my-4" />
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+};
+
+const ContextOverlay = ({ query, answer, sections = [], citations = [], onClose, onMinimize }) => {
+
+  const renderSection = (section, index) => {
+    const { title, content, type } = section;
+
+    // Ícone baseado no tipo
+    const getIcon = () => {
+      switch(type) {
+        case 'list': return <FiList className="w-4 h-4" />;
+        case 'code': return <FiCode className="w-4 h-4" />;
+        case 'steps': return <FiList className="w-4 h-4" />;
+        default: return <FiFileText className="w-4 h-4" />;
+      }
+    };
+
+    return (
+      <div key={index} className="mb-4 border-l-2 border-purple-500/30 pl-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-purple-400">{getIcon()}</span>
+          <h4 className="text-sm font-semibold text-gray-300">{title}</h4>
+        </div>
+        <div className="text-sm text-gray-400 leading-relaxed">
+          <MarkdownRenderer content={content} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
-      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300"
+      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
       style={{ WebkitAppRegion: 'no-drag' }}
     >
       {/* Header */}
@@ -47,17 +201,24 @@ const ContextOverlay = ({ query, answer, citations, onClose, onMinimize }) => {
       </div>
 
       {/* 2. AI Response Block */}
-      <div className="mb-6 text-gray-200 text-sm leading-relaxed font-light whitespace-pre-line">
-        {answer}
+      <div className="mb-4 text-gray-200 text-sm leading-relaxed font-light">
+        <MarkdownRenderer content={answer} />
       </div>
 
-      {/* 3. Evidence Carousel */}
+      {/* 3. Sections (if available) */}
+      {sections && sections.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {sections.map((section, index) => renderSection(section, index))}
+        </div>
+      )}
+
+      {/* 4. Citations (if available) */}
       {citations && citations.length > 0 && (
         <div className="mb-6">
           <h3 className="text-[10px] font-bold text-gray-600 uppercase mb-2 ml-1">Evidence Sources</h3>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
             {citations.map((cite) => (
-              <div 
+              <div
                 key={cite.id}
                 className="snap-start shrink-0 w-[140px] group cursor-pointer relative rounded-lg border border-white/10 bg-black/40 overflow-hidden hover:border-purple-500/50 transition-all duration-300"
               >
@@ -75,7 +236,7 @@ const ContextOverlay = ({ query, answer, citations, onClose, onMinimize }) => {
                      <FiPlay className="w-6 h-6 text-white drop-shadow-lg" />
                    </div>
                 </div>
-                
+
                 {/* Timestamp Badge */}
                 <div className="absolute top-1 right-1 bg-black/80 text-[9px] text-green-400 px-1.5 py-0.5 rounded font-mono border border-green-900/30">
                   {cite.timestamp}
@@ -93,7 +254,7 @@ const ContextOverlay = ({ query, answer, citations, onClose, onMinimize }) => {
         </div>
       )}
 
-      {/* 4. Quick Actions Footer */}
+      {/* 5. Quick Actions Footer */}
       <div className="flex gap-2 border-t border-white/10 pt-4">
         <QuickActionButton label="Gerar Resumo" />
         <QuickActionButton label="Enviar por Email" />
@@ -112,11 +273,14 @@ const QuickActionButton = ({ label }) => (
 ContextOverlay.propTypes = {
   query: PropTypes.string,
   answer: PropTypes.string,
+  sections: PropTypes.arrayOf(PropTypes.shape({
+    title: PropTypes.string,
+    content: PropTypes.string,
+    type: PropTypes.oneOf(['text', 'list', 'code', 'steps'])
+  })),
   citations: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.number,
-    timestamp: PropTypes.string,
-    img: PropTypes.string,
-    snippet: PropTypes.string
+    source: PropTypes.string,
+    relevance: PropTypes.string
   })),
   onClose: PropTypes.func,
   onMinimize: PropTypes.func

@@ -2,7 +2,7 @@
 export const APP_CONFIG = {
   name: 'NEXUS',
   version: '0.0.1',
-  shortcut: '⌘⌥␣'
+  shortcut: 'NX'
 };
 
 // Cores do tema

@@ -4,7 +4,6 @@ const windowTypeArg = process.argv.find(arg => arg.startsWith('--window-type='))
 const windowType = windowTypeArg ? windowTypeArg.split('=')[1] : null;
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Função para iniciar o drag da janela
   startDrag: () => {
     ipcRenderer.invoke('start-window-drag');
   },
@@ -28,5 +27,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('context-data', handler);
     return () => ipcRenderer.removeListener('context-data', handler);
+  },
+  askAI: (prompt) => {
+    return ipcRenderer.invoke('ask-ai', prompt);
+  },
+  saveMemory: (text, metadata) => {
+    return ipcRenderer.invoke('save-memory', { text, metadata });
   }
 });
