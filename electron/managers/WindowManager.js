@@ -41,10 +41,31 @@ export class WindowManager {
   loadWindowPosition(windowType, defaultSize) {
     try {
       if (fs.existsSync(this.configPaths[windowType])) {
-        return JSON.parse(fs.readFileSync(this.configPaths[windowType], 'utf8'));
+        const fileContent = fs.readFileSync(this.configPaths[windowType], 'utf8').trim();
+        
+        // Se o arquivo está vazio ou só tem espaços, ignorar
+        if (!fileContent) {
+          console.log(`Config file for ${windowType} is empty, using defaults`);
+        } else {
+          const config = JSON.parse(fileContent);
+          // Validar que tem os campos necessários
+          if (config.x !== undefined && config.y !== undefined && 
+              config.width !== undefined && config.height !== undefined) {
+            return config;
+          }
+        }
       }
     } catch (error) {
       console.error(`Error loading config for ${windowType}:`, error);
+      // Deletar arquivo corrompido
+      try {
+        if (fs.existsSync(this.configPaths[windowType])) {
+          fs.unlinkSync(this.configPaths[windowType]);
+          console.log(`Deleted corrupted config file for ${windowType}`);
+        }
+      } catch (deleteError) {
+        console.error(`Error deleting corrupted config:`, deleteError);
+      }
     }
     
     // Default centering
@@ -144,6 +165,13 @@ export class WindowManager {
           this.latestContextData = payload;
       }
       
+      // Se a janela já existe, apenas atualizar dados
+      if (this.windows.context && !this.windows.context.isDestroyed()) {
+        this.updateContextWindow(payload);
+        this.windows.context.focus();
+        return;
+      }
+      
       this.createWindow('context');
       
       const sendData = () => {
@@ -160,6 +188,17 @@ export class WindowManager {
       } else {
          sendData();
       }
+  }
+
+  updateContextWindow(payload) {
+    if (!this.windows.context || this.windows.context.isDestroyed()) return;
+    
+    if (payload) {
+      this.latestContextData = payload;
+    }
+    
+    console.log("WindowManager: Updating context-data (realtime):", payload.answer?.substring(0, 30) + "...");
+    this.windows.context.webContents.send('context-data', this.latestContextData);
   }
 
   resizeWindow(width, height) {

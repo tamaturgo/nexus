@@ -1,10 +1,15 @@
 import PropTypes from 'prop-types';
-import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus, FiList, FiCode, FiFileText } from 'react-icons/fi';
+import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus, FiList, FiCode, FiFileText, FiMic } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 // Componente customizado para renderizar markdown com estilos do tema
 const MarkdownRenderer = ({ content }) => {
+  // Validação de conteúdo
+  if (!content || typeof content !== 'string') {
+    return <p className="text-sm text-gray-400 italic">No content available</p>;
+  }
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -129,7 +134,10 @@ const MarkdownRenderer = ({ content }) => {
   );
 };
 
-const ContextOverlay = ({ query, answer, sections = [], citations = [], onClose, onMinimize }) => {
+const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceContext, isLiveVoice, onClose, onMinimize }) => {
+  
+  // Debug logs
+  console.log('ContextOverlay render:', { isLiveVoice, hasVoiceContext: !!voiceContext, voiceText: voiceContext?.text });
 
   const renderSection = (section, index) => {
     const { title, content, type } = section;
@@ -197,23 +205,82 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], onClose,
       {/* 1. User Query (Recap) */}
       <div className="mb-4 text-xs font-mono text-gray-500 uppercase tracking-wider flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-        Your Question: {query}
+        {isLiveVoice ? (
+          <span className="flex items-center gap-2">
+            <FiMic className="w-3 h-3 animate-pulse text-red-400" />
+            Live Capture
+          </span>
+        ) : (
+          `Your Question: ${query}`
+        )}
       </div>
 
-      {/* 2. AI Response Block */}
-      <div className="mb-4 text-gray-200 text-sm leading-relaxed font-light">
-        <MarkdownRenderer content={answer} />
-      </div>
+      {/* Voice Context - Live Mode */}
+      {isLiveVoice && voiceContext && (
+        <div className="mb-4">
+          <div className="p-4 bg-gradient-to-br from-purple-500/20 to-purple-900/20 border border-purple-500/40 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <FiMic className="text-purple-400 w-5 h-5 animate-pulse" />
+              <span className="text-sm font-semibold text-purple-300">
+                Transcrição Ao Vivo
+              </span>
+            </div>
+            
+            {/* Texto da transcrição com scroll */}
+            <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-transparent">
+              {voiceContext.text ? (
+                <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                  {voiceContext.text}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Aguardando áudio... Fale no microfone.
+                </p>
+              )}
+            </div>
+          </div>
+          
+        
+        </div>
+      )}
+
+      {/* Voice Context - Histórico */}
+      {!isLiveVoice && voiceContext && (
+        <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <FiMic className="text-purple-400 w-4 h-4" />
+            <span className="text-xs font-semibold text-purple-300">
+              Captura de Voz
+            </span>
+            <span className="text-xs text-gray-500 ml-auto">
+              {voiceContext.chunksProcessed || 0} chunks processados
+            </span>
+          </div>
+          <p className="text-sm text-gray-300 italic">
+            "{voiceContext.text?.substring(0, 200)}{voiceContext.text?.length > 200 ? '...' : ''}"
+          </p>
+          <div className="mt-2 text-xs text-gray-500">
+            Capturado em: {new Date(voiceContext.timestamp).toLocaleTimeString('pt-BR')}
+          </div>
+        </div>
+      )}
+
+      {/* 2. AI Response Block - Só mostrar se não for live */}
+      {!isLiveVoice && (
+        <div className="mb-4 text-gray-200 text-sm leading-relaxed font-light">
+          <MarkdownRenderer content={answer} />
+        </div>
+      )}
 
       {/* 3. Sections (if available) */}
-      {sections && sections.length > 0 && (
+      {!isLiveVoice && sections && sections.length > 0 && (
         <div className="mb-6 space-y-2">
           {sections.map((section, index) => renderSection(section, index))}
         </div>
       )}
 
       {/* 4. Citations (if available) */}
-      {citations && citations.length > 0 && (
+      {!isLiveVoice && citations && citations.length > 0 && (
         <div className="mb-6">
           <h3 className="text-[10px] font-bold text-gray-600 uppercase mb-2 ml-1">Evidence Sources</h3>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
@@ -255,11 +322,13 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], onClose,
       )}
 
       {/* 5. Quick Actions Footer */}
-      <div className="flex gap-2 border-t border-white/10 pt-4">
-        <QuickActionButton label="Gerar Resumo" />
-        <QuickActionButton label="Enviar por Email" />
-        <QuickActionButton label="Copiar Código" />
-      </div>
+      {!isLiveVoice && (
+        <div className="flex gap-2 border-t border-white/10 pt-4">
+          <QuickActionButton label="Gerar Resumo" />
+          <QuickActionButton label="Enviar por Email" />
+          <QuickActionButton label="Copiar Código" />
+        </div>
+      )}
     </div>
   );
 };
@@ -269,6 +338,14 @@ const QuickActionButton = ({ label }) => (
     {label}
   </button>
 );
+
+MarkdownRenderer.propTypes = {
+  content: PropTypes.string
+};
+
+QuickActionButton.propTypes = {
+  label: PropTypes.string.isRequired
+};
 
 ContextOverlay.propTypes = {
   query: PropTypes.string,
@@ -282,6 +359,13 @@ ContextOverlay.propTypes = {
     source: PropTypes.string,
     relevance: PropTypes.string
   })),
+  voiceContext: PropTypes.shape({
+    timestamp: PropTypes.number,
+    text: PropTypes.string,
+    chunksProcessed: PropTypes.number,
+    isLive: PropTypes.bool
+  }),
+  isLiveVoice: PropTypes.bool,
   onClose: PropTypes.func,
   onMinimize: PropTypes.func
 };

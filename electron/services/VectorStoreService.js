@@ -47,11 +47,12 @@ export class VectorStoreService {
     try {
       const vector = await this.getEmbedding(text);
       
+      // Only use basic fields that match the schema
       const data = [{
         vector,
         text,
-        timestamp: Date.now(),
-        ...metadata
+        type: metadata.type || 'general',
+        timestamp: metadata.timestamp || Date.now()
       }];
 
       if (!this.table) {

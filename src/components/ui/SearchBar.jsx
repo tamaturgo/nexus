@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
-import { FiClipboard, FiX, FiSend, FiSearch, FiSettings, FiZap, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiClipboard, FiX, FiSend, FiSearch, FiSettings, FiZap, FiEye, FiEyeOff, FiMic } from 'react-icons/fi';
 import ActionButton from '../common/ActionButton';
 import InputField from '../common/InputField';
 
@@ -31,7 +31,11 @@ const SearchBar = ({
   onQuickAction,
   micStatus,
   screenStatus,
-  onToggleScreenVision
+  onToggleScreenVision,
+  onToggleMicrophone,
+  isTranscribing,
+  permissionDenied,
+  chunksProcessed
 }) => {
   const [placeholder, setPlaceholder] = useState("Ask me anything...");
   
@@ -44,11 +48,13 @@ const SearchBar = ({
     ];
     let index = 0;
     const interval = setInterval(() => {
-      index = (index + 1) % placeholders.length;
-      setPlaceholder(placeholders[index]);
+      if (!micStatus && !isTranscribing) {
+        index = (index + 1) % placeholders.length;
+        setPlaceholder(placeholders[index]);
+      }
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [micStatus, isTranscribing]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -67,7 +73,13 @@ const SearchBar = ({
             onKeyDown={onKeyDown}
             disabled={isProcessing}
             inputRef={inputRef}
-            placeholder={micStatus ? "Listening..." : placeholder}
+            placeholder={
+              isTranscribing 
+                ? "Processing chunk..." 
+                : micStatus 
+                  ? `Listening... (${chunksProcessed} chunks)` 
+                  : placeholder
+            }
             icon={() => <Waveform isActive={micStatus} />}
           />
 
@@ -83,6 +95,27 @@ const SearchBar = ({
               className={screenStatus ? "text-green-400" : "text-gray-400"}
             >
               {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
+            </ActionButton>
+            
+            {/* Microphone Toggle */}
+            <ActionButton
+              onClick={onToggleMicrophone}
+              title={
+                permissionDenied 
+                  ? "Clique para permitir microfone" 
+                  : micStatus 
+                    ? "Parar captura de voz" 
+                    : "Iniciar captura de voz"
+              }
+              className={
+                permissionDenied 
+                  ? "text-yellow-400" 
+                  : micStatus 
+                    ? "text-red-400 animate-pulse" 
+                    : "text-gray-400"
+              }
+            >
+              <FiMic className="w-4 h-4" />
             </ActionButton>
             
             <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />
@@ -133,7 +166,7 @@ const SearchBar = ({
 
             <ActionButton
               onClick={handleSubmit}
-              disabled={!inputValue.trim() || isProcessing}
+              disabled={!inputValue.trim() || isProcessing || isTranscribing}
               variant="primary"
               title="Executar"
             >
@@ -164,7 +197,11 @@ SearchBar.propTypes = {
   onQuickAction: PropTypes.func.isRequired,
   micStatus: PropTypes.bool,
   screenStatus: PropTypes.bool,
-  onToggleScreenVision: PropTypes.func
+  onToggleScreenVision: PropTypes.func,
+  onToggleMicrophone: PropTypes.func.isRequired,
+  isTranscribing: PropTypes.bool,
+  permissionDenied: PropTypes.bool,
+  chunksProcessed: PropTypes.number
 };
 
 export default SearchBar;
