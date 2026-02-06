@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-export const useAssistant = () => {
+export const useAssistant = ({ windowType = 'single', isElectron = false } = {}) => {
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [interactionCount, setInteractionCount] = useState(0);
@@ -20,20 +20,21 @@ export const useAssistant = () => {
 
   // Handle Window Resizing based on ViewMode
   useEffect(() => {
+    if (!isElectron || windowType !== 'search') return;
+
     // Definir tamanhos para cada modo
     // Base width: 600px (definido no main.js padrão)
-    const COLLAPSED_HEIGHT = 120; // Apenas barra
+    const COLLAPSED_HEIGHT = 180; // Apenas barra
     const EXPANDED_HEIGHT = 600;  // Com overlay/settings
 
-    // Se estiver rodando no Electron
     if (window.electronAPI && window.electronAPI.resizeWindow) {
       if (viewMode === 'collapsed') {
-         window.electronAPI.resizeWindow(600, COLLAPSED_HEIGHT);
+        window.electronAPI.resizeWindow(600, COLLAPSED_HEIGHT);
       } else {
-         window.electronAPI.resizeWindow(600, EXPANDED_HEIGHT);
+        window.electronAPI.resizeWindow(600, EXPANDED_HEIGHT);
       }
     }
-  }, [viewMode]);
+  }, [viewMode, windowType, isElectron]);
 
   useEffect(() => {
     // Focar no input quando o hook é inicializado
@@ -76,16 +77,25 @@ export const useAssistant = () => {
 
     // Simular processamento da IA
     setTimeout(() => {
-      setIsProcessing(false);
-      setMockData({
+      const payload = {
         query: inputValue,
         answer: "Com base na reunião das 10h, o cronograma foi ajustado para incluir a fase de testes na próxima terça-feira. \n\nO time concordou que a integração do backend deve ser priorizada antes da UI final.",
         citations: [
-            { id: 1, timestamp: "10:32:15", snippet: "Discussão sobre cronograma", img: null },
-            { id: 2, timestamp: "10:45:00", snippet: "Acordo sobre Backend", img: null },
+          { id: 1, timestamp: "10:32:15", snippet: "Discussão sobre cronograma", img: null },
+          { id: 2, timestamp: "10:45:00", snippet: "Acordo sobre Backend", img: null },
         ]
-      });
-      setViewMode('context'); // Expand to show results
+      };
+
+      setIsProcessing(false);
+      setMockData(payload);
+
+      if (isElectron && window.electronAPI?.openWindow) {
+        window.electronAPI.openWindow('context', payload);
+        setViewMode('collapsed');
+      } else {
+        setViewMode('context'); // Expand to show results
+      }
+
       setInputValue('');
     }, 2000);
   };
@@ -107,6 +117,12 @@ export const useAssistant = () => {
   };
 
   const showSettings = () => {
+    if (isElectron && window.electronAPI?.openWindow) {
+      window.electronAPI.openWindow('settings');
+      setViewMode('collapsed');
+      return;
+    }
+
     setViewMode(prev => prev === 'settings' ? 'collapsed' : 'settings');
   };
 

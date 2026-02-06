@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 const windowTypeArg = process.argv.find(arg => arg.startsWith('--window-type='));
 const windowType = windowTypeArg ? windowTypeArg.split('=')[1] : null;
@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   closeCurrentWindow: () => {
     ipcRenderer.invoke('close-current-window');
+  },
+  minimizeCurrentWindow: () => {
+    ipcRenderer.invoke('minimize-current-window');
   },
   getContextData: () => {
     return ipcRenderer.invoke('get-context-data');

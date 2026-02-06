@@ -1,23 +1,53 @@
 import PropTypes from 'prop-types';
-import { FiCpu, FiDatabase, FiLock, FiToggleLeft, FiToggleRight, FiZap } from 'react-icons/fi';
+import { FiCpu, FiDatabase, FiLock, FiToggleLeft, FiToggleRight, FiZap, FiX, FiMinus } from 'react-icons/fi';
 
 const NeuralCenter = ({ 
   selectedProvider, 
   onSelectProvider,
   cpuLoad,
   activePlugins,
-  onTogglePlugin
+  onTogglePlugin,
+  onClose,
+  onMinimize
 }) => {
   return (
-    <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300">
+    <div
+      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300"
+      style={{ WebkitAppRegion: 'no-drag' }}
+    >
       
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-2">
+      <div
+        className="flex items-center justify-between mb-6 border-b border-white/10 pb-2"
+        style={{ WebkitAppRegion: 'drag' }}
+      >
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
           <FiZap className="text-purple-500" />
           Neural Center
         </h2>
-        <span className="text-[10px] text-gray-500 font-mono">SYS.READY</span>
+        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' }}>
+          <span className="text-[10px] text-gray-500 font-mono">SYS.READY</span>
+          {onMinimize && (
+            <button
+              onClick={onMinimize}
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Minimizar"
+              title="Minimizar"
+            >
+              <FiMinus className="w-4 h-4" />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Fechar"
+              title="Fechar"
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -127,7 +157,9 @@ NeuralCenter.propTypes = {
   onSelectProvider: PropTypes.func,
   cpuLoad: PropTypes.number,
   activePlugins: PropTypes.array,
-  onTogglePlugin: PropTypes.func
+  onTogglePlugin: PropTypes.func,
+  onClose: PropTypes.func,
+  onMinimize: PropTypes.func
 };
 
 export default NeuralCenter;

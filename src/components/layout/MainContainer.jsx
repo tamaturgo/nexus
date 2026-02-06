@@ -6,7 +6,6 @@ const MainContainer = ({ children, isFocused }) => {
       <div className="w-full max-w-4xl">
         <div 
           className={`bg-black ${isFocused ? 'bg-opacity-95 neon-box-shadow' : 'bg-opacity-80'} backdrop-blur-2xl rounded-2xl border border-white border-opacity-10 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out`}
-          style={{ WebkitAppRegion: 'drag' }}
         >
           {children}
         </div>

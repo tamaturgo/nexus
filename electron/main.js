@@ -10,16 +10,27 @@ const __dirname = path.dirname(__filename);
 const isDev = process.env.NODE_ENV !== 'production';
 const DEV_URL = 'http://localhost:5173';
 
-let mainWindow = null;
-let isWindowVisible = false;
+const windows = {
+  search: null,
+  context: null,
+  settings: null
+};
+let isSearchWindowVisible = false;
 
 // Caminho para armazenar configurações da janela
-const WINDOW_CONFIG_PATH = path.join(app.getPath('userData'), 'window-config.json');
+const WINDOW_CONFIG_PATHS = {
+  search: path.join(app.getPath('userData'), 'window-config-search.json'),
+  context: path.join(app.getPath('userData'), 'window-config-context.json'),
+  settings: path.join(app.getPath('userData'), 'window-config-settings.json')
+};
+
+let latestContextData = null;
 
 // Funções para salvar/carregar posição da janela
-function saveWindowPosition() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    const bounds = mainWindow.getBounds();
+function saveWindowPosition(windowType) {
+  const targetWindow = windows[windowType];
+  if (targetWindow && !targetWindow.isDestroyed()) {
+    const bounds = targetWindow.getBounds();
     const config = {
       x: bounds.x,
       y: bounds.y,
@@ -28,17 +39,18 @@ function saveWindowPosition() {
     };
     
     try {
-      fs.writeFileSync(WINDOW_CONFIG_PATH, JSON.stringify(config, null, 2));
+      fs.writeFileSync(WINDOW_CONFIG_PATHS[windowType], JSON.stringify(config, null, 2));
     } catch (error) {
       console.error('Erro ao salvar configuração da janela:', error);
     }
   }
 }
 
-function loadWindowPosition() {
+function loadWindowPosition(windowType, defaultSize) {
   try {
-    if (fs.existsSync(WINDOW_CONFIG_PATH)) {
-      const config = JSON.parse(fs.readFileSync(WINDOW_CONFIG_PATH, 'utf8'));
+    const configPath = WINDOW_CONFIG_PATHS[windowType];
+    if (configPath && fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       return config;
     }
   } catch (error) {
@@ -48,38 +60,41 @@ function loadWindowPosition() {
   // Posição padrão caso não haja configuração salva
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   return {
-    x: Math.round((screenWidth - 600) / 2),
-    y: Math.round((screenHeight - 180) / 2),
-    width: 600,
-    height: 180
+    x: Math.round((screenWidth - defaultSize.width) / 2),
+    y: Math.round((screenHeight - defaultSize.height) / 2),
+    width: defaultSize.width,
+    height: defaultSize.height
   };
 }
 
-function showWindow() {
-  if (mainWindow && !isWindowVisible) {
-    mainWindow.show();
-    mainWindow.focus();
+function showSearchWindow() {
+  if (windows.search && !isSearchWindowVisible) {
+    windows.search.show();
+    windows.search.focus();
   }
 }
 
-function hideWindow() {
-  if (mainWindow && isWindowVisible) {
-    mainWindow.hide();
+function hideSearchWindow() {
+  if (windows.search && isSearchWindowVisible) {
+    windows.search.hide();
   }
 }
 
 function toggleWindow() {
-  if (isWindowVisible) {
-    hideWindow();
+  if (isSearchWindowVisible) {
+    hideSearchWindow();
   } else {
-    showWindow();
+    showSearchWindow();
   }
 }
 
-function createWindow() {
-  const windowConfig = loadWindowPosition();
-  
-  mainWindow = new BrowserWindow({
+function createWindow(windowType) {
+  const defaultSize = windowType === 'search'
+    ? { width: 600, height: 180 }
+    : { width: 600, height: 600 };
+  const windowConfig = loadWindowPosition(windowType, defaultSize);
+
+  const windowOptions = {
     x: windowConfig.x,
     y: windowConfig.y,
     width: windowConfig.width,
@@ -90,7 +105,7 @@ function createWindow() {
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    closable: false,
+    closable: windowType !== 'search',
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -98,80 +113,121 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.cjs'),
+      additionalArguments: [`--window-type=${windowType}`]
     }
-  });
+  };
 
-  // Salvar posição da janela quando movida ou redimensionada
-  mainWindow.on('moved', () => {
-    saveWindowPosition();
-  });
+  const newWindow = new BrowserWindow(windowOptions);
+  windows[windowType] = newWindow;
 
-  mainWindow.on('resized', () => {
-    saveWindowPosition();
-  });
+  newWindow.on('moved', () => saveWindowPosition(windowType));
+  newWindow.on('resized', () => saveWindowPosition(windowType));
 
-  // IPC handlers
-  ipcMain.handle('start-window-drag', () => {
-    // Handler mantido para compatibilidade futura
-  });
+  if (windowType === 'search') {
+    // Prevenir fechamento
+    newWindow.on('close', (e) => {
+      e.preventDefault();
+    });
 
-  ipcMain.handle('resize-window', (event, { width, height }) => {
-    if (mainWindow) {
-      const bounds = mainWindow.getBounds();
-      // Manter a posição centralizada ou x constante, ajustar y se necessário para não sair da tela
-      // Por enquanto, apenas redimensiona mantendo (x,y) ou centralizando no eixo Y se preferir
-      // Vamos manter a posição superior (y) fixa ou ajustada?
-      // Geralmente "expandir para baixo" significa manter y e aumentar height.
-      mainWindow.setSize(width, height, true); // true for animate on Mac
-    }
-  });
+    // Prevenir minimização
+    newWindow.on('minimize', (e) => {
+      e.preventDefault();
+    });
 
-  // Prevenir fechamento
-  mainWindow.on('close', (e) => {
-    e.preventDefault();
-  });
+    newWindow.on('show', () => {
+      isSearchWindowVisible = true;
+    });
 
-  // Prevenir minimização
-  mainWindow.on('minimize', (e) => {
-    e.preventDefault();
-  });
-
-  // Controlar visibilidade
-  mainWindow.on('show', () => {
-    isWindowVisible = true;
-  });
-
-  mainWindow.on('hide', () => {
-    isWindowVisible = false;
-  });
+    newWindow.on('hide', () => {
+      isSearchWindowVisible = false;
+    });
+  } else {
+    newWindow.on('closed', () => {
+      if (windows[windowType] === newWindow) {
+        windows[windowType] = null;
+      }
+    });
+  }
 
   // esconde o conteúdo do compartimento da janela até que esteja totalmente carregado
-  mainWindow.setContentProtection(true);
+  newWindow.setContentProtection(true);
 
-  mainWindow.webContents.once('did-finish-load', () => {
-    if (!isWindowVisible) {
-      showWindow();
+  newWindow.webContents.once('did-finish-load', () => {
+    if (windowType === 'search') {
+      if (!isSearchWindowVisible) {
+        showSearchWindow();
+      }
+    } else {
+      newWindow.show();
+      newWindow.focus();
+      if (windowType === 'context' && latestContextData) {
+        newWindow.webContents.send('context-data', latestContextData);
+      }
     }
   });
 
   if (isDev) {
-    mainWindow.loadURL(DEV_URL);
+    newWindow.loadURL(`${DEV_URL}/?window=${windowType}`);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    newWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
+      query: { window: windowType }
+    });
   }
 }
+
+ipcMain.handle('start-window-drag', () => {
+  // Handler mantido para compatibilidade futura
+});
+
+ipcMain.handle('resize-window', (event, { width, height }) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender);
+  if (targetWindow) {
+    targetWindow.setSize(width, height, true);
+  }
+});
+
+ipcMain.handle('open-window', (event, { type, payload }) => {
+  const windowType = type || 'search';
+  if (!windows[windowType] || windows[windowType].isDestroyed()) {
+    createWindow(windowType);
+  } else {
+    windows[windowType].show();
+    windows[windowType].focus();
+  }
+
+  if (windowType === 'context' && payload) {
+    latestContextData = payload;
+    windows[windowType]?.webContents.send('context-data', latestContextData);
+  }
+});
+
+ipcMain.handle('close-current-window', (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender);
+  if (targetWindow && targetWindow !== windows.search) {
+    targetWindow.close();
+  }
+});
+
+ipcMain.handle('minimize-current-window', (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender);
+  if (targetWindow && targetWindow !== windows.search) {
+    targetWindow.minimize();
+  }
+});
+
+ipcMain.handle('get-context-data', () => latestContextData);
 
 app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Alt+Space', () => {
     toggleWindow();
   });
 
-  createWindow();
+  createWindow('search');
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    if (!windows.search || windows.search.isDestroyed()) {
+      createWindow('search');
     }
   });
 });

@@ -5,6 +5,51 @@ import NeuralCenter from './components/layout/NeuralCenter';
 import { useAssistant } from './hooks/useAssistant';
 
 function App() {
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+  const windowType = isElectron
+    ? (window.electronAPI?.getWindowType?.()
+        || new URLSearchParams(window.location.search).get('window')
+        || 'search')
+    : 'single';
+
+  const handleCloseWindow = () => {
+    if (isElectron && window.electronAPI?.closeCurrentWindow) {
+      window.electronAPI.closeCurrentWindow();
+    }
+  };
+
+  const handleMinimizeWindow = () => {
+    if (isElectron && window.electronAPI?.minimizeCurrentWindow) {
+      window.electronAPI.minimizeCurrentWindow();
+    }
+  };
+
+  const [contextData, setContextData] = useState({
+    query: '',
+    answer: '',
+    citations: []
+  });
+
+  useEffect(() => {
+    if (windowType !== 'context' || !isElectron) return;
+    let isMounted = true;
+
+    window.electronAPI?.getContextData?.().then((data) => {
+      if (!isMounted || !data) return;
+      setContextData(data);
+    });
+
+    const unsubscribe = window.electronAPI?.onContextData?.((data) => {
+      if (!data) return;
+      setContextData(data);
+    });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [windowType, isElectron]);
+
   const {
     inputValue,
     isProcessing,
@@ -26,7 +71,7 @@ function App() {
     settings,
     setSelectedProvider,
     togglePlugin
-  } = useAssistant();
+  } = useAssistant({ windowType, isElectron });
 
   const [isFocused, setIsFocused] = useState(false);
 
@@ -42,6 +87,36 @@ function App() {
       window.removeEventListener('blur', handleBlur);
     };
   }, []);
+
+  if (windowType === 'context') {
+    return (
+      <MainContainer isFocused={true}>
+        <ContextOverlay
+          query={contextData.query}
+          answer={contextData.answer}
+          citations={contextData.citations}
+          onClose={handleCloseWindow}
+          onMinimize={handleMinimizeWindow}
+        />
+      </MainContainer>
+    );
+  }
+
+  if (windowType === 'settings') {
+    return (
+      <MainContainer isFocused={true}>
+        <NeuralCenter
+          selectedProvider={settings.selectedProvider}
+          onSelectProvider={setSelectedProvider}
+          cpuLoad={settings.cpuLoad}
+          activePlugins={settings.activePlugins}
+          onTogglePlugin={togglePlugin}
+          onClose={handleCloseWindow}
+          onMinimize={handleMinimizeWindow}
+        />
+      </MainContainer>
+    );
+  }
 
   return (
     <MainContainer isFocused={isFocused}>
@@ -71,28 +146,30 @@ function App() {
         onToggleScreenVision={toggleScreenVision}
       />
 
-      {/* Dynamic Content Views */}
-      <div className="relative">
-         {/* Context Overlay View */}
-         {viewMode === 'context' && (
-           <ContextOverlay 
-             query={mockData.query}
-             answer={mockData.answer}
-             citations={mockData.citations}
-           />
-         )}
+      {/* Dynamic Content Views (Single Window Mode) */}
+      {windowType === 'single' && (
+        <div className="relative">
+          {/* Context Overlay View */}
+          {viewMode === 'context' && (
+            <ContextOverlay
+              query={mockData.query}
+              answer={mockData.answer}
+              citations={mockData.citations}
+            />
+          )}
 
-         {/* Neural Center (Settings) View */}
-         {viewMode === 'settings' && (
-           <NeuralCenter 
-             selectedProvider={settings.selectedProvider}
-             onSelectProvider={setSelectedProvider}
-             cpuLoad={settings.cpuLoad}
-             activePlugins={settings.activePlugins}
-             onTogglePlugin={togglePlugin}
-           />
-         )}
-      </div>
+          {/* Neural Center (Settings) View */}
+          {viewMode === 'settings' && (
+            <NeuralCenter
+              selectedProvider={settings.selectedProvider}
+              onSelectProvider={setSelectedProvider}
+              cpuLoad={settings.cpuLoad}
+              activePlugins={settings.activePlugins}
+              onTogglePlugin={togglePlugin}
+            />
+          )}
+        </div>
+      )}
 
       {/* Footer (Only in collapsed mode) */}
       {viewMode === 'collapsed' && <Footer />}

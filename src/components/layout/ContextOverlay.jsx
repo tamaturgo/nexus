@@ -1,14 +1,49 @@
 import PropTypes from 'prop-types';
-import { FiPlay, FiCpu, FiCheck, FiX, FiLayers } from 'react-icons/fi';
+import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus } from 'react-icons/fi';
 import ActionButton from '../common/ActionButton';
 
-const ContextOverlay = ({ query, answer, citations }) => {
+const ContextOverlay = ({ query, answer, citations, onClose, onMinimize }) => {
   return (
-    <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300">
+    <div
+      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300"
+      style={{ WebkitAppRegion: 'no-drag' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between mb-3"
+        style={{ WebkitAppRegion: 'drag' }}
+      >
+        <div className="text-xs font-mono text-gray-500 uppercase tracking-wider flex items-center gap-2">
+            AI Response
+        </div>
+        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' }}>
+          {onMinimize && (
+            <button
+              onClick={onMinimize}
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Minimizar"
+              title="Minimizar"
+            >
+              <FiMinus className="w-4 h-4" />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Fechar"
+              title="Fechar"
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* 1. User Query (Recap) */}
       <div className="mb-4 text-xs font-mono text-gray-500 uppercase tracking-wider flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-        Contexto: {query}
+        Your Question: {query}
       </div>
 
       {/* 2. AI Response Block */}
@@ -82,7 +117,9 @@ ContextOverlay.propTypes = {
     timestamp: PropTypes.string,
     img: PropTypes.string,
     snippet: PropTypes.string
-  }))
+  })),
+  onClose: PropTypes.func,
+  onMinimize: PropTypes.func
 };
 
 export default ContextOverlay;

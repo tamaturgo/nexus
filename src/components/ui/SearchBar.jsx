@@ -57,7 +57,7 @@ const SearchBar = ({
   };
 
   return (
-    <div className="relative">
+    <div className="relative" style={{ WebkitAppRegion: 'drag' }}>
       {/* Área de input */}
       <div className="p-3">
         <form onSubmit={handleSubmit} className="relative">
