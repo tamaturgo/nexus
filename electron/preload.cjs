@@ -45,5 +45,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getDesktopSources: (options) => {
     return ipcRenderer.invoke('get-desktop-sources', options);
+  },
+  startSystemCapture: (options) => {
+    return ipcRenderer.invoke('system-capture-start', options);
+  },
+  stopSystemCapture: () => {
+    return ipcRenderer.invoke('system-capture-stop');
+  },
+  getSystemCaptureDevices: () => {
+    return ipcRenderer.invoke('system-capture-devices');
+  },
+  onSystemTranscription: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-transcription', handler);
+    return () => ipcRenderer.removeListener('system-transcription', handler);
+  },
+  onSystemTranscriptionStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-transcription-status', handler);
+    return () => ipcRenderer.removeListener('system-transcription-status', handler);
+  },
+  onSystemCaptureStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-capture-status', handler);
+    return () => ipcRenderer.removeListener('system-capture-status', handler);
+  },
+  onSystemCaptureError: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-capture-error', handler);
+    return () => ipcRenderer.removeListener('system-capture-error', handler);
   }
 });

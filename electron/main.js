@@ -5,6 +5,7 @@ import { WindowManager } from './managers/WindowManager.js';
 import { AIService } from './services/AIService.js';
 import { VectorStoreService } from './services/VectorStoreService.js';
 import { WhisperService } from './services/WhisperService.js';
+import { SystemAudioCaptureService } from './services/SystemAudioCaptureService.js';
 import { AssistantManager } from './managers/AssistantManager.js';
 import { registerHandlers } from './ipc/ipcHandlers.js';
 
@@ -17,6 +18,7 @@ const windowManager = new WindowManager(__dirname);
 const aiService = new AIService();
 const vectorStoreService = new VectorStoreService();
 const whisperService = new WhisperService();
+const systemAudioService = new SystemAudioCaptureService(whisperService);
 const assistantManager = new AssistantManager(aiService, vectorStoreService); 
 
 // App Lifecycle
@@ -26,7 +28,7 @@ app.whenReady().then(async () => {
   await whisperService.initialize();
 
   // Register IPC Handlers
-  registerHandlers(windowManager, assistantManager, whisperService);
+  registerHandlers(windowManager, assistantManager, whisperService, systemAudioService);
 
   // Global Shortcuts
   globalShortcut.register('CommandOrControl+Alt+Space', () => {

@@ -207,6 +207,14 @@ export class WindowManager {
     }
   }
 
+  broadcast(channel, payload) {
+    Object.values(this.windows).forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, payload);
+      }
+    });
+  }
+
   closeCurrentWindow(webContents) {
       const win = BrowserWindow.fromWebContents(webContents);
       if (win && win !== this.windows.search) {
