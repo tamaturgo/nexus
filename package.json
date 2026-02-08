@@ -8,7 +8,8 @@
     "dev": "concurrently \"npm run web:dev\" \"wait-on http://localhost:5173 && cross-env NODE_OPTIONS='--dns-result-order=ipv4first' electron .\"",
     "build": "npm run build && electron-builder",
     "web:dev": "vite",
-    "web:build": "vite build"
+    "web:build": "vite build",
+    "postinstall": "node scripts/download-model.js"
   },
   "author": "",
   "license": "ISC",
