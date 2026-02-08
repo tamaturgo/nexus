@@ -24,12 +24,23 @@ class AIService {
     } else {
       // Mock fallback for browser dev mode
       return new Promise((resolve) => {
+        // Simular delay de processamento (2-4 segundos)
+        const delay = 2000 + Math.random() * 2000;
+        
         setTimeout(() => {
+          // Retornar a transcrição sem processamento (como especificado)
           resolve({
-            answer: `[MOCK] You asked: "${prompt}". This is a mock response because you are not in Electron or the backend is disconnected.`,
+            answer: `[Transcrição Capturada]\n\n${prompt}\n\n---\n\n(Processamento de IA será adicionado quando API key estiver disponível)`,
+            sections: [
+              {
+                title: "Informações da Captura",
+                content: `• Tempo de processamento: ${(delay/1000).toFixed(1)}s\n• Modo: Simulação\n• Status: Transcrição salva na memória vetorial`,
+                type: "list"
+              }
+            ],
             citations: []
           });
-        }, 1500);
+        }, delay);
       });
     }
   }

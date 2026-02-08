@@ -72,4 +72,17 @@ export class AssistantManager {
           type: 'explicit_memory'
       });
   }
+
+  async saveTranscription(text, metadata) {
+    try {
+      return await this.vectorStoreService.addDocument(text, {
+        ...metadata,
+        timestamp: metadata.timestamp || Date.now(),
+        type: 'voice_transcription'
+      });
+    } catch (error) {
+      console.error("AssistantManager: Failed to save transcription", error);
+      throw error;
+    }
+  }
 }

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openWindow: (type, payload) => {
     ipcRenderer.invoke('open-window', { type, payload });
   },
+  updateContextWindow: (payload) => {
+    ipcRenderer.invoke('update-context-window', payload);
+  },
   closeCurrentWindow: () => {
     ipcRenderer.invoke('close-current-window');
   },
@@ -33,5 +36,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   saveMemory: (text, metadata) => {
     return ipcRenderer.invoke('save-memory', { text, metadata });
+  },
+  saveTranscription: ({ text, metadata }) => {
+    return ipcRenderer.invoke('save-transcription', { text, metadata });
+  },
+  transcribeAudio: ({ audioBuffer, options }) => {
+    return ipcRenderer.invoke('transcribe-audio', { audioBuffer, options });
+  },
+  getDesktopSources: (options) => {
+    return ipcRenderer.invoke('get-desktop-sources', options);
+  },
+  startSystemCapture: (options) => {
+    return ipcRenderer.invoke('system-capture-start', options);
+  },
+  stopSystemCapture: () => {
+    return ipcRenderer.invoke('system-capture-stop');
+  },
+  getSystemCaptureDevices: () => {
+    return ipcRenderer.invoke('system-capture-devices');
+  },
+  onSystemTranscription: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-transcription', handler);
+    return () => ipcRenderer.removeListener('system-transcription', handler);
+  },
+  onSystemTranscriptionStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-transcription-status', handler);
+    return () => ipcRenderer.removeListener('system-transcription-status', handler);
+  },
+  onSystemCaptureStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-capture-status', handler);
+    return () => ipcRenderer.removeListener('system-capture-status', handler);
+  },
+  onSystemCaptureError: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('system-capture-error', handler);
+    return () => ipcRenderer.removeListener('system-capture-error', handler);
   }
 });

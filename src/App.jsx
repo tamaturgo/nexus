@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Header, Footer, SearchBar, MainContainer } from './components';
 import ContextOverlay from './components/layout/ContextOverlay';
 import NeuralCenter from './components/layout/NeuralCenter';
+import ErrorToast from './components/common/ErrorToast';
 import { useAssistant } from './hooks/useAssistant';
 
 function App() {
@@ -28,7 +29,8 @@ function App() {
     query: '',
     answer: '',
     sections: [],
-    citations: []
+    citations: [],
+    voiceContext: null
   });
 
   useEffect(() => {
@@ -67,14 +69,30 @@ function App() {
     micStatus,
     screenStatus,
     toggleScreenVision,
+    toggleMicrophone,
+    transcription,
+    isTranscribing,
+    voiceError,
+    permissionDenied,
+    chunksProcessed,
     viewMode,
     mockData,
+    liveVoiceContext,
     settings,
     setSelectedProvider,
     togglePlugin
   } = useAssistant({ windowType, isElectron });
 
   const [isFocused, setIsFocused] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  // Monitorar erros de voz
+  useEffect(() => {
+    if (voiceError) {
+      setErrorMessage(voiceError);
+      setTimeout(() => setErrorMessage(null), 5000); // Auto-dismiss após 5s
+    }
+  }, [voiceError]);
 
   useEffect(() => {
     const handleFocus = () => setIsFocused(true);
@@ -95,6 +113,9 @@ function App() {
       ? contextData.answer 
       : (contextData.answer?.answer || JSON.stringify(contextData.answer || ""));
 
+    // Detectar se é contexto de voz ao vivo
+    const isLive = contextData.voiceContext?.isLive || false;
+
     return (
       <MainContainer isFocused={true}>
         <ContextOverlay
@@ -102,6 +123,8 @@ function App() {
           answer={finalAnswer}
           sections={contextData.sections || []}
           citations={contextData.citations || []}
+          voiceContext={contextData.voiceContext}
+          isLiveVoice={isLive}
           onClose={handleCloseWindow}
           onMinimize={handleMinimizeWindow}
         />
@@ -127,6 +150,12 @@ function App() {
 
   return (
     <MainContainer isFocused={isFocused}>
+      {/* Error Toast */}
+      <ErrorToast 
+        message={errorMessage} 
+        onDismiss={() => setErrorMessage(null)} 
+      />
+
       {/* Header */}
       {viewMode === 'collapsed' && (
         <Header
@@ -151,6 +180,10 @@ function App() {
         micStatus={micStatus}
         screenStatus={screenStatus}
         onToggleScreenVision={toggleScreenVision}
+        onToggleMicrophone={toggleMicrophone}
+        isTranscribing={isTranscribing}
+        permissionDenied={permissionDenied}
+        chunksProcessed={chunksProcessed}
       />
 
       {/* Dynamic Content Views (Single Window Mode) */}
@@ -159,10 +192,12 @@ function App() {
           {/* Context Overlay View */}
           {viewMode === 'context' && (
             <ContextOverlay
-              query={mockData.query}
-              answer={mockData.answer}
-              sections={mockData.sections || []}
-              citations={mockData.citations}
+              query={liveVoiceContext?.isLive ? "Contexto de Voz Ao Vivo" : (mockData?.query || "Query")}
+              answer={liveVoiceContext?.isLive ? (liveVoiceContext.text || "") : (mockData?.answer || "No response")}
+              sections={liveVoiceContext?.isLive ? [] : (mockData?.sections || [])}
+              citations={liveVoiceContext?.isLive ? [] : (mockData?.citations || [])}
+              voiceContext={liveVoiceContext}
+              isLiveVoice={liveVoiceContext?.isLive || false}
             />
           )}
 
