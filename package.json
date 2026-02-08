@@ -5,7 +5,7 @@
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run web:dev\" \"wait-on http://localhost:5173 && NODE_OPTIONS='--dns-result-order=ipv4first' electron .\"",
+    "dev": "concurrently \"npm run web:dev\" \"wait-on http://localhost:5173 && cross-env NODE_OPTIONS='--dns-result-order=ipv4first' electron .\"",
     "build": "npm run build && electron-builder",
     "web:dev": "vite",
     "web:build": "vite build"
@@ -33,6 +33,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.17",
     "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
     "postcss": "^8.4.33",

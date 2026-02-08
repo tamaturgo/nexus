@@ -1,9 +1,9 @@
-import { spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { app } from 'electron';
-import { fileURLToPath } from 'url';
+import { spawn, spawnSync } from "child_process";
+import path from "path";
+import fs from "fs";
+import os from "os";
+import { app } from "electron";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,8 +14,8 @@ export class WhisperService {
     this.whisperPath = null;
     this.modelPath = null;
     this.libPath = null;
-    this.tempDir = path.join(os.tmpdir(), 'nexus-audio');
-    
+    this.tempDir = path.join(os.tmpdir(), "nexus-audio");
+
     // Criar diretório temporário
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
@@ -26,25 +26,25 @@ export class WhisperService {
     try {
       // Detectar o diretório base da aplicação
       const isDev = !app.isPackaged;
-      const basePath = isDev 
-        ? path.join(__dirname, '../../') 
-        : path.dirname(app.getPath('exe'));
+      const basePath = isDev
+        ? path.join(__dirname, "../../")
+        : path.dirname(app.getPath("exe"));
 
       // Configurar caminhos para Windows
       const platform = os.platform();
-      if (platform === 'win32') {
-        // No Windows, o executável é whisper-cli.exe
-        this.whisperPath = path.join(basePath, 'resources/bin/win/whisper-cli.exe');
-        // As DLLs devem estar no mesmo diretório do executável
-        this.libPath = path.join(basePath, 'resources/bin/win');
-        
-        // Verificar se o modelo existe
-        const modelDir = path.join(basePath, 'resources/models');
+      if (platform === "win32") {
+        this.whisperPath = path.join(
+          basePath,
+          "resources/bin/win/whisper-cli.exe"
+        );
+        this.libPath = path.join(basePath, "resources/bin/win");
+
+        const modelDir = path.join(basePath, "resources/models");
         const possibleModels = [
-          'ggml-base.bin',
-          'ggml-small.bin',
-          'ggml-tiny.bin',
-          'ggml-medium.bin'
+          "ggml-base.bin",
+          "ggml-small.bin",
+          "ggml-tiny.bin",
+          "ggml-medium.bin",
         ];
 
         for (const model of possibleModels) {
@@ -55,21 +55,17 @@ export class WhisperService {
           }
         }
 
-        // Verificar se o binário existe
         if (!fs.existsSync(this.whisperPath)) {
           throw new Error(`Whisper binary not found at: ${this.whisperPath}`);
         }
 
-        // Se não encontrou modelo, avisa mas permite inicializar
         if (!this.modelPath) {
-          console.warn('WhisperService: No model found, will need to download one');
-          console.warn(`Expected model location: ${modelDir}`);
+          console.warn("WhisperService: No model found.");
         }
 
-        console.log('WhisperService: Initialized (Windows)');
+        console.log("WhisperService: Initialized (Windows)");
         console.log(`  Binary: ${this.whisperPath}`);
-        console.log(`  Model: ${this.modelPath || 'not found'}`);
-        console.log(`  DLL path: ${this.libPath}`);
+        console.log(`  Model: ${this.modelPath}`);
       } else {
         throw new Error(`Platform ${platform} not yet supported`);
       }
@@ -77,153 +73,197 @@ export class WhisperService {
       this.isInitialized = true;
       return true;
     } catch (error) {
-      console.error('WhisperService: Initialization failed:', error);
+      console.error("WhisperService: Initialization failed:", error);
       return false;
     }
   }
 
   async transcribe(audioBuffer, options = {}) {
-    const {
-      language = 'pt',
-      maxDuration = 30
-    } = options;
+    const { language = "pt" } = options;
 
-    if (!this.isInitialized) {
-      throw new Error('WhisperService not initialized');
-    }
-
-    if (!this.modelPath) {
-      throw new Error('Whisper model not found. Please download a model to resources/models/');
-    }
+    if (!this.isInitialized) throw new Error("WhisperService not initialized");
+    if (!this.modelPath) throw new Error("Whisper model not found");
 
     try {
-      console.log(`WhisperService: Processing ${audioBuffer.length} bytes of audio`);
-      
-      // Salvar áudio em arquivo temporário
-      const timestamp = Date.now();
-      const audioFilePath = await this.saveAudioToFile(audioBuffer, `audio-${timestamp}.wav`);
+      console.log(`WhisperService: Processing ${audioBuffer.length} bytes`);
 
-      // Executar whisper-cli
+      const timestamp = Date.now();
+      const audioFilePath = await this.saveAudioToFile(
+        audioBuffer,
+        `rec-${timestamp}.wav`
+      );
+
       const result = await this.runWhisper(audioFilePath, language);
 
-      // Limpar arquivo temporário
       try {
-        fs.unlinkSync(audioFilePath);
+        if (fs.existsSync(audioFilePath)) fs.unlinkSync(audioFilePath);
       } catch (e) {
-        console.warn('Failed to delete temp audio file:', e);
+        console.warn("Failed to delete temp audio file:", e);
       }
-
-      console.log(`WhisperService: Transcription completed (${result.text.length} chars)`);
 
       return {
         text: result.text,
         language: language,
         duration: result.duration || 0,
-        confidence: result.confidence || 0.9
+        confidence: result.confidence || 0.9,
       };
     } catch (error) {
-      console.error('WhisperService: Transcription failed:', error);
+      console.error("WhisperService: Transcription failed:", error);
       throw error;
     }
   }
 
   async runWhisper(audioFilePath, language) {
     return new Promise((resolve, reject) => {
+      const whisperPath = this.whisperPath;
+
+      const modelPath = this.getShortPath(this.modelPath);
+      const inputPath = this.getShortPath(audioFilePath);
+      
+      const tempDirShort = this.getShortPath(this.tempDir);
+      const outputPath = path.join(tempDirShort, "output"); 
+
       const args = [
-        '-m', this.modelPath,
-        '-f', audioFilePath,
-        '-l', language,
-        '--output-txt',
-        '--output-file', path.join(this.tempDir, 'output'),
-        '--no-prints'
+        "-m", modelPath,
+        "-f", inputPath,
+        "-l", language,
+        "--no-flash-attn",
+        "--no-gpu",
+        "--output-txt",
+        "--output-file", outputPath,
+        "--no-prints",
       ];
 
       // Configurar environment
       const env = { ...process.env };
-      
-      // No Windows, adicionar o diretório das DLLs ao PATH
-      if (os.platform() === 'win32' && this.libPath && fs.existsSync(this.libPath)) {
-        env.PATH = this.libPath + ';' + (env.PATH || '');
+      if (os.platform() === "win32" && this.libPath) {
+        env.PATH = this.libPath + ";" + (env.PATH || "");
       }
 
-      console.log('WhisperService: Running command:', this.whisperPath, args.join(' '));
+      console.log("WhisperService: Command:", whisperPath, args.join(" "));
 
-      const whisperProcess = spawn(this.whisperPath, args, {
+      const whisperProcess = spawn(whisperPath, args, {
         env,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsVerbatimArguments: true,
       });
 
-      let stdout = '';
-      let stderr = '';
+      let stdout = "";
+      let stderr = "";
 
-      whisperProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+      whisperProcess.stdout.on("data", (data) => (stdout += data.toString()));
+      whisperProcess.stderr.on("data", (data) => (stderr += data.toString()));
 
-      whisperProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      whisperProcess.on('error', (error) => {
+      whisperProcess.on("error", (error) => {
         reject(new Error(`Failed to start whisper process: ${error.message}`));
       });
 
-      whisperProcess.on('close', (code) => {
+      whisperProcess.on("close", (code) => {
         if (code !== 0) {
-          reject(new Error(`Whisper process exited with code ${code}\nStderr: ${stderr}`));
-          return;
+          console.warn(`Whisper stderr: ${stderr}`);
         }
 
-        // Ler o arquivo de saída
-        const outputFile = path.join(this.tempDir, 'output.txt');
+        const expectedOutputFile = `${outputPath}.txt`;
+        
+        const fallbackFile = path.join(this.tempDir, "output.txt");
+
         try {
-          if (fs.existsSync(outputFile)) {
-            const text = fs.readFileSync(outputFile, 'utf-8').trim();
-            fs.unlinkSync(outputFile); // Limpar arquivo de saída
-            
-            resolve({
-              text,
-              duration: 0, // Whisper CLI não retorna duration facilmente
-              confidence: 0.9
-            });
+          let text = "";
+          
+          if (fs.existsSync(expectedOutputFile)) {
+            text = fs.readFileSync(expectedOutputFile, "utf-8").trim();
+            fs.unlinkSync(expectedOutputFile);
+          } else if (fs.existsSync(fallbackFile)) {
+            text = fs.readFileSync(fallbackFile, "utf-8").trim();
+            fs.unlinkSync(fallbackFile);
           } else {
-            // Tentar extrair texto do stdout/stderr
-            const text = stdout.trim() || stderr.trim();
-            resolve({
-              text: text || '',
-              duration: 0,
-              confidence: 0.9
-            });
+            text = stdout.trim() || stderr.trim();
           }
+
+          if (!text && code !== 0) {
+            reject(new Error(`Whisper failed with code ${code}: ${stderr}`));
+            return;
+          }
+
+          resolve({
+            text: text || "",
+            duration: 0,
+            confidence: 0.9,
+          });
         } catch (error) {
-          reject(new Error(`Failed to read whisper output: ${error.message}`));
+          reject(new Error(`Failed to read output: ${error.message}`));
         }
       });
     });
   }
 
+  getShortPath(inputPath) {
+    if (os.platform() !== "win32" || !inputPath) return inputPath;
+
+    try {
+      const resolvedPath = path.resolve(inputPath);
+      
+      if (!fs.existsSync(resolvedPath)) {
+        return resolvedPath;
+      }
+
+      const command = `chcp 65001 > nul && for %I in ("${resolvedPath}") do @echo %~sI`;
+
+      const result = spawnSync("cmd", ["/c", command], {
+        windowsHide: true,
+        encoding: "utf8",
+        shell: true //
+      });
+
+      if (result.error) return resolvedPath;
+
+      const output = (result.stdout || "").trim();
+      const match = output.match(/([a-zA-Z]:\\[^\s\r\n"]+)/);
+      
+      if (match && match[1]) {
+          // Remove barra invertida final se existir (causa do erro "file not found")
+          let clean = match[1];
+          if (clean.endsWith('\\') && !clean.endsWith(':\\')) {
+              clean = clean.slice(0, -1);
+          }
+          return clean;
+      }
+
+      return resolvedPath;
+    } catch (error) {
+      console.warn("WhisperService: Short path failed, using original:", error);
+      return inputPath;
+    }
+  }
+
   async saveAudioToFile(audioBuffer, filename) {
     const filepath = path.join(this.tempDir, filename);
-    
-    // Converter para formato WAV se necessário
-    // Por enquanto, assumir que o buffer já está em formato adequado
-    // TODO: Adicionar conversão para WAV usando ffmpeg se necessário
-    fs.writeFileSync(filepath, audioBuffer);
-    
+    try {
+      fs.writeFileSync(filepath, audioBuffer);
+    } catch (error) {
+      console.error("WhisperService: Failed to write temp file:", error);
+      throw error;
+    }
+
+    try {
+      const stats = fs.statSync(filepath);
+      console.log(
+        `WhisperService: Saved ${stats.size} bytes to ${filepath}`
+      );
+    } catch (error) {
+      console.warn("WhisperService: Failed to stat temp file:", error);
+    }
+
     return filepath;
   }
 
   cleanup() {
-    // Limpar arquivos temporários
     try {
       if (fs.existsSync(this.tempDir)) {
-        const files = fs.readdirSync(this.tempDir);
-        files.forEach(file => {
-          fs.unlinkSync(path.join(this.tempDir, file));
-        });
+        fs.rmSync(this.tempDir, { recursive: true, force: true });
       }
     } catch (error) {
-      console.error('WhisperService: Cleanup failed:', error);
+      console.error("Cleanup failed:", error);
     }
   }
 }
