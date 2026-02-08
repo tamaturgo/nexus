@@ -4,7 +4,7 @@ const TARGET_SAMPLE_RATE = 16000;
 const SILENCE_THRESHOLD = 0.02; 
 const SILENCE_DURATION = 1500;  
 const MAX_CHUNK_DURATION = 30000; 
-const MIN_SAMPLES_TO_PROCESS = 16000 * 1.2; // Exige ao menos 1.2 segundos de áudio real
+const MIN_SAMPLES_TO_PROCESS = 16000 * 1.2;
 
 const downsampleBuffer = (buffer, inputRate, targetRate) => {
   if (inputRate === targetRate) return buffer;
