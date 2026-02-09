@@ -8,7 +8,7 @@ import http from "http";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const MODEL_URL = process.env.WHISPER_MODEL_URL;
+const MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
 const MODEL_SHA256 = process.env.WHISPER_MODEL_SHA256;
 const MODEL_NAME = process.env.WHISPER_MODEL_NAME || "ggml-small.bin";
 const MODELS_DIR = process.env.WHISPER_MODELS_DIR || path.join(__dirname, "..", "resources", "models");
