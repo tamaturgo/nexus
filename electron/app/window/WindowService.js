@@ -3,7 +3,18 @@ export class WindowService {
     this.windowManager = windowManager;
   }
 
-  resizeWindow(width, height) {
+  resizeWindow(width, height, windowRef = null) {
+    this.windowManager.resizeWindow(width, height, windowRef);
+  }
+
+  resizeCurrentWindow(webContents, width, height) {
+    const win = this.windowManager.getWindowFromWebContents
+      ? this.windowManager.getWindowFromWebContents(webContents)
+      : null;
+    if (win) {
+      this.windowManager.resizeWindow(width, height, win);
+      return;
+    }
     this.windowManager.resizeWindow(width, height);
   }
 

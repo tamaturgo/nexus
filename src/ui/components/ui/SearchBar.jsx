@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
-import { useState, useEffect } from 'react';
-import { FiClipboard, FiX, FiSend, FiSearch, FiSettings, FiZap, FiEye, FiEyeOff, FiMic } from 'react-icons/fi';
+import { useState, useEffect, useRef } from 'react';
+import { FiClipboard, FiX, FiSend, FiSettings, FiEye, FiEyeOff, FiMic, FiClock } from 'react-icons/fi';
 import ActionButton from '../common/ActionButton';
 import InputField from '../common/InputField';
 
@@ -26,18 +26,20 @@ const SearchBar = ({
   inputRef,
   onCopyToClipboard,
   onClearInput,
-  onSearchWeb,
   onShowSettings,
-  onQuickAction,
+  onShowHistory,
   micStatus,
   screenStatus,
   onToggleScreenVision,
   onToggleMicrophone,
   isTranscribing,
   permissionDenied,
-  chunksProcessed
+  chunksProcessed,
+  onHeightChange
 }) => {
   const [placeholder, setPlaceholder] = useState("Ask me anything...");
+  const [isTyping, setIsTyping] = useState(false);
+  const containerRef = useRef(null);
   
   useEffect(() => {
     const placeholders = [
@@ -56,46 +58,58 @@ const SearchBar = ({
     return () => clearInterval(interval);
   }, [micStatus, isTranscribing]);
 
+  useEffect(() => {
+    if (!containerRef.current || !onHeightChange) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      onHeightChange(Math.ceil(entry.contentRect.height));
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [onHeightChange]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!inputValue.trim() || isProcessing) return;
     onSubmit(e);
   };
 
+  const showQuickIcons = !isTyping && !inputValue;
+
   return (
     <div className="relative" style={{ WebkitAppRegion: 'drag' }}>
       {/* Área de input */}
-      <div className="p-3">
-        <form onSubmit={handleSubmit} className="relative">
-          <InputField
-            value={inputValue}
-            onChange={onInputChange}
-            onKeyDown={onKeyDown}
-            disabled={isProcessing}
-            inputRef={inputRef}
-            placeholder={
-              isTranscribing 
-                ? "Processing chunk..." 
-                : micStatus 
-                  ? `Listening... (${chunksProcessed} chunks)` 
-                  : placeholder
-            }
-            icon={() => <Waveform isActive={micStatus} />}
-          />
+      <div ref={containerRef} className="p-3">
+        <form onSubmit={handleSubmit} className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <InputField
+              value={inputValue}
+              onChange={onInputChange}
+              onKeyDown={onKeyDown}
+              onFocus={() => setIsTyping(true)}
+              onBlur={() => setIsTyping(false)}
+              inputRef={inputRef}
+              placeholder={placeholder}
+              icon={() => <Waveform isActive={micStatus} />}
+              maxHeight={160}
+            />
+          </div>
 
           {/* Controles à direita */}
           <div 
-            className="absolute right-3 top-3 flex items-center gap-1"
+            className="flex items-center gap-1 pt-1 ml-auto justify-end min-w-[200px]"
             style={{ WebkitAppRegion: 'no-drag' }}
           >
-            {/* Vision Toggle */}
-             <ActionButton
-              onClick={onToggleScreenVision}
-              title={screenStatus ? "Vision On" : "Vision Off"}
-              className={screenStatus ? "text-green-400" : "text-gray-400"}
-            >
-              {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
-            </ActionButton>
+            {showQuickIcons && (
+              <ActionButton
+                onClick={onToggleScreenVision}
+                title={screenStatus ? "Vision On" : "Vision Off"}
+                className={screenStatus ? "text-green-400" : "text-gray-400"}
+              >
+                {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
+              </ActionButton>
+            )}
             
             {/* Microphone Toggle */}
             <ActionButton
@@ -118,7 +132,7 @@ const SearchBar = ({
               <FiMic className="w-4 h-4" />
             </ActionButton>
             
-            <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />
+            {showQuickIcons && <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />}
 
             {inputValue && (
               <ActionButton
@@ -129,29 +143,25 @@ const SearchBar = ({
               </ActionButton>
             )}
 
-            <ActionButton
-              onClick={onSearchWeb}
-              disabled={!inputValue || isProcessing}
-              title="Buscar na web"
-            >
-              <FiSearch className="w-4 h-4" />
-            </ActionButton>
+            {showQuickIcons && (
+              <>
+                <ActionButton
+                  onClick={onShowSettings}
+                  disabled={isProcessing}
+                  title="Configurações"
+                >
+                  <FiSettings className="w-4 h-4" />
+                </ActionButton>
 
-            <ActionButton
-              onClick={onQuickAction}
-              disabled={isProcessing}
-              title="Ação rápida"
-            >
-              <FiZap className="w-4 h-4" />
-            </ActionButton>
-
-            <ActionButton
-              onClick={onShowSettings}
-              disabled={isProcessing}
-              title="Configurações"
-            >
-              <FiSettings className="w-4 h-4" />
-            </ActionButton>
+                <ActionButton
+                  onClick={onShowHistory}
+                  disabled={isProcessing}
+                  title="Histórico"
+                >
+                  <FiClock className="w-4 h-4" />
+                </ActionButton>
+              </>
+            )}
 
             {inputValue && (
               <ActionButton
@@ -162,7 +172,7 @@ const SearchBar = ({
               </ActionButton>
             )}
 
-            <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />
+            {showQuickIcons && <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />}
 
             <ActionButton
               onClick={handleSubmit}
@@ -192,16 +202,16 @@ SearchBar.propTypes = {
   inputRef: PropTypes.object,
   onCopyToClipboard: PropTypes.func.isRequired,
   onClearInput: PropTypes.func.isRequired,
-  onSearchWeb: PropTypes.func.isRequired,
   onShowSettings: PropTypes.func.isRequired,
-  onQuickAction: PropTypes.func.isRequired,
+  onShowHistory: PropTypes.func.isRequired,
   micStatus: PropTypes.bool,
   screenStatus: PropTypes.bool,
   onToggleScreenVision: PropTypes.func,
   onToggleMicrophone: PropTypes.func.isRequired,
   isTranscribing: PropTypes.bool,
   permissionDenied: PropTypes.bool,
-  chunksProcessed: PropTypes.number
+  chunksProcessed: PropTypes.number,
+  onHeightChange: PropTypes.func
 };
 
 export default SearchBar;

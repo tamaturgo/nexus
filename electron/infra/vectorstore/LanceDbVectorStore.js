@@ -91,4 +91,19 @@ export class LanceDbVectorStore {
       return [];
     }
   }
+
+  async clearAll() {
+    try {
+      if (this.dbPath && fs.existsSync(this.dbPath)) {
+        fs.rmSync(this.dbPath, { recursive: true, force: true });
+      }
+      this.db = null;
+      this.table = null;
+      this.embedder = null;
+      return true;
+    } catch (error) {
+      console.error("LanceDbVectorStore: Clear all failed:", error);
+      return false;
+    }
+  }
 }

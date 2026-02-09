@@ -6,8 +6,8 @@ export const registerWindowHandlers = (windowService) => {
     return undefined;
   });
 
-  ipcMain.handle(CHANNELS.WINDOW.RESIZE, (_event, { width, height }) => {
-    windowService.resizeWindow(width, height);
+  ipcMain.handle(CHANNELS.WINDOW.RESIZE, (event, { width, height }) => {
+    windowService.resizeCurrentWindow(event.sender, width, height);
   });
 
   ipcMain.handle(CHANNELS.WINDOW.OPEN, (_event, { type, payload }) => {

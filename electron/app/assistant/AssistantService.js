@@ -1,12 +1,13 @@
 import { buildContextualPrompt, JSON_OUTPUT_INSTRUCTIONS } from "./promptTemplates.js";
 
 export class AssistantService {
-  constructor(aiClient, vectorStore) {
+  constructor(aiClient, vectorStore, settingsStore) {
     this.aiClient = aiClient;
     this.vectorStore = vectorStore;
+    this.settingsStore = settingsStore;
   }
 
-  async processQuery(text) {
+  async processQuery(text, options = {}) {
     console.log(`AssistantService: Processing query: "${text}"`);
 
     let contextItems = [];
@@ -22,7 +23,11 @@ export class AssistantService {
 
     let response = null;
     try {
-      const rawText = await this.aiClient.generateText(fullPrompt);
+      const aiSettings = this.settingsStore?.getSettings?.().ai || {};
+      const rawText = await this.aiClient.generateText(fullPrompt, {
+        model: options.model || aiSettings.model,
+        temperature: options.temperature ?? aiSettings.temperature
+      });
       response = this.normalizeResponse(rawText);
     } catch (error) {
       console.error("AssistantService: AI generation failed", error);

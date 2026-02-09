@@ -2,7 +2,17 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { askAi } from "../../app/ai/askAi.js";
 import { useMicTranscription } from "./useMicTranscription.js";
 import { useSystemTranscription } from "./useSystemTranscription.js";
-import { openWindow, resizeWindow } from "../../infra/ipc/electronBridge.js";
+import { DEFAULT_SETTINGS } from "../../../shared/settings/defaults.js";
+import { createId } from "../../app/context/uuid.js";
+import { saveHistoryItem } from "../../app/context/contextHistory.js";
+import {
+  openWindow,
+  resizeWindow,
+  getSettings,
+  saveSettings,
+  resetSettings,
+  clearAllMemory
+} from "../../infra/ipc/electronBridge.js";
 
 export const useAssistant = ({ windowType = "single", isElectron = false } = {}) => {
   const [inputValue, setInputValue] = useState("");
@@ -13,7 +23,17 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
   const [mockData, setMockData] = useState({ query: "", answer: "", sections: [], citations: [], voiceContext: null });
   const [lastVoiceCapture, setLastVoiceCapture] = useState(null);
   const [liveVoiceContext, setLiveVoiceContext] = useState(null);
+  const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const inputRef = useRef(null);
+  const historyIdsRef = useRef({});
+  const [searchContentHeight, setSearchContentHeight] = useState(0);
+
+  const [settingsState, setSettingsState] = useState({ ...DEFAULT_SETTINGS });
+  const [activePlugins, setActivePlugins] = useState([
+    { id: "gcal", name: "Google Calendar", active: true },
+    { id: "slack", name: "Slack Connect", active: false },
+    { id: "notion", name: "Notion", active: true }
+  ]);
 
   const {
     isListening: micActive,
@@ -25,7 +45,10 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     chunksProcessed: micChunks,
     startListening: startMic,
     stopListening: stopMic
-  } = useMicTranscription();
+  } = useMicTranscription({
+    autoSaveTranscription: settingsState.memory?.autoSaveTranscription,
+    audioSettings: settingsState.audio
+  });
 
   const {
     isCapturing: systemActive,
@@ -37,14 +60,9 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     lastEvent: systemLastEvent,
     startCapture: startSystemCapture,
     stopCapture: stopSystemCapture
-  } = useSystemTranscription();
-
-  const [selectedProvider, setSelectedProvider] = useState("gemini");
-  const [activePlugins, setActivePlugins] = useState([
-    { id: "gcal", name: "Google Calendar", active: true },
-    { id: "slack", name: "Slack Connect", active: false },
-    { id: "notion", name: "Notion", active: true }
-  ]);
+  } = useSystemTranscription({
+    audioSettings: settingsState.audio
+  });
 
   const updateLiveVoiceContext = useCallback((source, text, chunks, timestamp) => {
     const voiceCtx = {
@@ -56,16 +74,32 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     };
 
     if (isElectron) {
+      const key = `transcription-${source}`;
+      const contextId = historyIdsRef.current[key] || createId();
+      historyIdsRef.current[key] = contextId;
+
       const payload = {
         query: source === "system" ? "Captura do Sistema" : "Captura do Microfone",
         answer: text,
         sections: [],
         citations: [],
         voiceContext: voiceCtx,
-        contextKey: `transcription-${source}`
+        contextKey: key,
+        contextId
       };
 
       openWindow("context", payload);
+      saveHistoryItem?.({
+        contextId,
+        contextKey: key,
+        payload: {
+          ...payload,
+          voiceContext: {
+            ...voiceCtx,
+            isLive: false
+          }
+        }
+      }).then(() => setHistoryRefreshToken(prev => prev + 1));
       return;
     }
     setLiveVoiceContext(voiceCtx);
@@ -90,6 +124,28 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
       inputRef.current.focus();
     }
   }, []);
+
+  useEffect(() => {
+    if (!inputRef.current) return;
+    if (viewMode !== "collapsed") return;
+    if (windowType !== "search") return;
+    if (!document.hasFocus()) return;
+    inputRef.current.focus({ preventScroll: true });
+  }, [micActive, systemActive, micProcessing, systemProcessing, isProcessing, windowType, viewMode]);
+
+  useEffect(() => {
+    if (!isElectron || !getSettings) return;
+    let mounted = true;
+
+    getSettings().then((data) => {
+      if (!mounted || !data) return;
+      setSettingsState({ ...DEFAULT_SETTINGS, ...data });
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isElectron]);
 
   useEffect(() => {
     if (!micFullTranscription) return;
@@ -128,25 +184,34 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     setInteractionCount(prev => prev + 1);
 
     try {
-      const response = await askAi(queryText);
+      const response = await askAi(queryText, {
+        model: settingsState.ai?.model,
+        temperature: settingsState.ai?.temperature
+      });
 
-      setMockData({
+      const contextId = createId();
+      const payload = {
         query: queryText,
         answer: response.answer || response,
         sections: response.sections || [],
         citations: response.citations || [],
-        voiceContext: voiceCtx
-      });
+        voiceContext: voiceCtx,
+        contextKey: "ask",
+        contextId
+      };
+
+      setMockData(payload);
 
       if (isElectron) {
-        openWindow("context", {
-          query: queryText,
-          answer: response.answer || response,
-          sections: response.sections || [],
-          citations: response.citations || [],
-          voiceContext: voiceCtx,
-          contextKey: "ask"
-        });
+        openWindow("context", payload);
+        saveHistoryItem?.({
+          contextId,
+          contextKey: "ask",
+          payload: {
+            ...payload,
+            voiceContext: voiceCtx ? { ...voiceCtx, isLive: false } : null
+          }
+        }).then(() => setHistoryRefreshToken(prev => prev + 1));
         setViewMode("collapsed");
       } else {
         setViewMode("context");
@@ -173,10 +238,6 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     setViewMode("collapsed");
   };
 
-  const searchWeb = () => {
-    console.log("Searching web for:", inputValue);
-  };
-
   const showSettings = () => {
     if (isElectron) {
       openWindow("settings");
@@ -187,8 +248,13 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     setViewMode(prev => prev === "settings" ? "collapsed" : "settings");
   };
 
-  const quickAction = () => {
-    console.log("Quick action");
+  const showHistory = () => {
+    if (isElectron) {
+      openWindow("history");
+      setViewMode("collapsed");
+      return;
+    }
+    setViewMode(prev => prev === "history" ? "collapsed" : "history");
   };
 
   const toggleScreenVision = () => {
@@ -197,17 +263,72 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
 
   const toggleMicrophone = async () => {
     if (micActive || systemActive) {
-      await stopSystemCapture();
-      await stopMic();
+      if (settingsState.audio?.inputDevice !== "system") {
+        await stopMic();
+      }
+      if (settingsState.audio?.inputDevice !== "mic") {
+        await stopSystemCapture();
+      }
       return;
     }
 
-    await startSystemCapture();
-    await startMic();
+    if (settingsState.audio?.inputDevice !== "system") {
+      await startMic();
+    }
+    if (settingsState.audio?.inputDevice !== "mic") {
+      await startSystemCapture();
+    }
   };
 
   const togglePlugin = (id) => {
     setActivePlugins(prev => prev.map(p => p.id === id ? { ...p, active: !p.active } : p));
+  };
+
+  const updateSettings = async (partial) => {
+    const next = {
+      ...settingsState,
+      ...partial,
+      audio: { ...settingsState.audio, ...(partial?.audio || {}) },
+      ai: { ...settingsState.ai, ...(partial?.ai || {}) },
+      memory: { ...settingsState.memory, ...(partial?.memory || {}) }
+    };
+    setSettingsState(next);
+    if (isElectron) {
+      await saveSettings?.(next);
+    }
+  };
+
+  const resetSettingsState = async () => {
+    if (isElectron) {
+      const data = await resetSettings?.();
+      if (data) {
+        setSettingsState({ ...DEFAULT_SETTINGS, ...data });
+        return;
+      }
+    }
+    setSettingsState({ ...DEFAULT_SETTINGS });
+  };
+
+  const clearMemory = async () => {
+    if (isElectron) {
+      await clearAllMemory?.();
+      setSettingsState({ ...DEFAULT_SETTINGS });
+    }
+  };
+
+  const openHistoryItem = (payload) => {
+    if (!payload) return;
+    if (isElectron) {
+      const contextId = payload.contextId || createId();
+      openWindow("context", {
+        ...payload,
+        contextId,
+        contextKey: contextId
+      });
+      return;
+    }
+    setMockData(payload);
+    setViewMode("context");
   };
 
   const combinedTranscription = micTranscription || systemTranscription;
@@ -232,7 +353,7 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     permissionDenied,
     chunksProcessed: combinedChunks,
     settings: {
-      selectedProvider,
+      ...settingsState,
       activePlugins,
       cpuLoad: 34
     },
@@ -242,13 +363,18 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     handleSubmit,
     copyToClipboard,
     clearInput,
-    searchWeb,
     showSettings,
-    quickAction,
+    showHistory,
     toggleScreenVision,
     toggleMicrophone,
 
-    setSelectedProvider,
-    togglePlugin
+    updateSettings,
+    resetSettingsState,
+    clearMemory,
+    togglePlugin,
+    historyRefreshToken,
+    openHistoryItem,
+    setSearchContentHeight,
+    searchContentHeight
   };
 };

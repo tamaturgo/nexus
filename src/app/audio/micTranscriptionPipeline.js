@@ -9,12 +9,18 @@ export const createMicTranscriptionPipeline = ({
   onTranscription,
   onError,
   onProcessingChange,
-  language = DEFAULT_LANGUAGE
+  language = DEFAULT_LANGUAGE,
+  silenceThreshold,
+  silenceMs
 }) => {
   const chunker = new AudioChunker({
     sampleRate,
-    silenceThreshold: MIC_CHUNK_OPTIONS.silenceThreshold,
-    silenceMs: MIC_CHUNK_OPTIONS.silenceMs,
+    silenceThreshold: typeof silenceThreshold === "number"
+      ? silenceThreshold
+      : MIC_CHUNK_OPTIONS.silenceThreshold,
+    silenceMs: typeof silenceMs === "number"
+      ? silenceMs
+      : MIC_CHUNK_OPTIONS.silenceMs,
     maxChunkMs: MIC_CHUNK_OPTIONS.maxChunkMs,
     minChunkMs: MIC_CHUNK_OPTIONS.minChunkMs
   });

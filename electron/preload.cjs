@@ -2,7 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 let CHANNELS;
 
 try {
-  ({ CHANNELS } = require("../shared/ipc/channels.cjs"));
+  const channelsPath = `${__dirname}/../shared/ipc/channels.cjs`;
+  ({ CHANNELS } = require(channelsPath));
 } catch (error) {
   console.error("preload: failed to load shared channels, using fallback", error);
   CHANNELS = {
@@ -34,6 +35,21 @@ try {
       ERROR_EVENT: "system-capture-error",
       TRANSCRIPTION_EVENT: "system-transcription",
       PROCESSING_EVENT: "system-transcription-status"
+    },
+    SETTINGS: {
+      GET: "settings-get",
+      SAVE: "settings-save",
+      RESET: "settings-reset"
+    },
+    MEMORY: {
+      CLEAR_ALL: "memory-clear-all"
+    },
+    CONTEXT_HISTORY: {
+      LIST: "context-history-list",
+      GET: "context-history-get",
+      SAVE: "context-history-save",
+      FAVORITE: "context-history-favorite",
+      DELETE: "context-history-delete"
     },
     DESKTOP_CAPTURE: {
       GET_SOURCES: "get-desktop-sources"
@@ -95,6 +111,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   getDesktopSources: (options) => {
     return ipcRenderer.invoke(CHANNELS.DESKTOP_CAPTURE.GET_SOURCES, options);
+  },
+  getSettings: () => {
+    return ipcRenderer.invoke(CHANNELS.SETTINGS.GET);
+  },
+  saveSettings: (partial) => {
+    return ipcRenderer.invoke(CHANNELS.SETTINGS.SAVE, partial);
+  },
+  resetSettings: () => {
+    return ipcRenderer.invoke(CHANNELS.SETTINGS.RESET);
+  },
+  clearAllMemory: () => {
+    return ipcRenderer.invoke(CHANNELS.MEMORY.CLEAR_ALL);
+  },
+  listContextHistory: () => {
+    return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.LIST);
+  },
+  getContextHistoryItem: (contextId) => {
+    return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.GET, { contextId });
+  },
+  saveContextHistory: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.SAVE, payload);
+  },
+  toggleContextFavorite: (contextId) => {
+    return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.FAVORITE, { contextId });
+  },
+  deleteContextHistory: (contextId) => {
+    return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.DELETE, { contextId });
   },
   onSystemTranscription: (callback) => {
     const handler = (_event, data) => callback(data);

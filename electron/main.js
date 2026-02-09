@@ -8,6 +8,9 @@ import { LanceDbVectorStore } from "./infra/vectorstore/LanceDbVectorStore.js";
 import { WhisperCliTranscriber } from "./infra/transcription/WhisperCliTranscriber.js";
 import { SystemCaptureController } from "./app/audio/SystemCaptureController.js";
 import { AssistantService } from "./app/assistant/AssistantService.js";
+import { SettingsStore } from "./app/settings/SettingsStore.js";
+import { MemoryService } from "./app/memory/MemoryService.js";
+import { ContextHistoryStore } from "./app/context/ContextHistoryStore.js";
 import { registerHandlers } from "./ipc/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,7 +22,10 @@ const aiClient = new GeminiClient();
 const vectorStore = new LanceDbVectorStore();
 const transcriber = new WhisperCliTranscriber();
 const systemCaptureController = new SystemCaptureController(transcriber);
-const assistantService = new AssistantService(aiClient, vectorStore);
+const settingsStore = new SettingsStore();
+const memoryService = new MemoryService(vectorStore, settingsStore);
+const assistantService = new AssistantService(aiClient, vectorStore, settingsStore);
+const contextHistoryStore = new ContextHistoryStore();
 
 app.whenReady().then(async () => {
   await vectorStore.initialize();
@@ -29,7 +35,10 @@ app.whenReady().then(async () => {
     windowService,
     assistantService,
     transcriber,
-    systemCaptureController
+    systemCaptureController,
+    settingsStore,
+    memoryService,
+    contextHistoryStore
   });
 
   globalShortcut.register("CommandOrControl+Alt+Space", () => {

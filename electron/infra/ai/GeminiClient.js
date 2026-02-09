@@ -13,13 +13,19 @@ export class GeminiClient {
     this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
-  async generateText(prompt) {
+  async generateText(prompt, options = {}) {
+    const {
+      model = "gemini-2.5-flash",
+      temperature = 0.7,
+      maxOutputTokens = 2000
+    } = options;
+
     const response = await this.client.models.generateContent({
-      model: "gemini-2.5-flash",
+      model,
       contents: prompt,
       config: {
-        temperature: 0.7,
-        maxOutputTokens: 2000
+        temperature,
+        maxOutputTokens
       }
     });
 

@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header, Footer, SearchBar, MainContainer } from "./ui/components";
 import ContextOverlay from "./ui/components/layout/ContextOverlay";
 import NeuralCenter from "./ui/components/layout/NeuralCenter";
+import ContextHistory from "./ui/components/layout/ContextHistory";
 import ErrorToast from "./ui/components/common/ErrorToast";
 import { useAssistant } from "./ui/hooks/useAssistant";
 import {
@@ -9,12 +10,14 @@ import {
   getWindowType,
   getContextData,
   onContextData,
+  resizeWindow,
   closeCurrentWindow,
   minimizeCurrentWindow
 } from "./infra/ipc/electronBridge.js";
 
 function App() {
-  const isElectron = bridgeIsElectron();
+  const hasWindowParam = new URLSearchParams(window.location.search).has("window");
+  const isElectron = bridgeIsElectron() || hasWindowParam;
   const windowType = isElectron
     ? (getWindowType()
         || new URLSearchParams(window.location.search).get("window")
@@ -29,7 +32,7 @@ function App() {
 
   const handleMinimizeWindow = () => {
     if (isElectron) {
-      minimizeCurrentWindow();
+      closeCurrentWindow();
     }
   };
 
@@ -71,9 +74,8 @@ function App() {
     handleSubmit,
     copyToClipboard,
     clearInput,
-    searchWeb,
     showSettings,
-    quickAction,
+    showHistory,
     micStatus,
     screenStatus,
     toggleScreenVision,
@@ -86,12 +88,18 @@ function App() {
     mockData,
     liveVoiceContext,
     settings,
-    setSelectedProvider,
-    togglePlugin
+    historyRefreshToken,
+    updateSettings,
+    resetSettingsState,
+    clearMemory,
+    openHistoryItem,
+    setSearchContentHeight,
+    searchContentHeight
   } = useAssistant({ windowType, isElectron });
 
   const [isFocused, setIsFocused] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const searchContentRef = useRef(null);
 
   useEffect(() => {
     if (voiceError) {
@@ -113,6 +121,24 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isElectron) return;
+    const WIDTH = 600;
+    if (windowType === "search") {
+      const height = viewMode === "history" ? 700 : 220;
+      resizeWindow(WIDTH, height);
+    }
+    if (windowType === "context") {
+      resizeWindow(WIDTH, 720);
+    }
+    if (windowType === "settings") {
+      resizeWindow(WIDTH, 820);
+    }
+    if (windowType === "history") {
+      resizeWindow(WIDTH, 720);
+    }
+  }, [isElectron, windowType, viewMode, searchContentHeight]);
+
   if (windowType === "context") {
     const finalAnswer = typeof contextData.answer === "string"
       ? contextData.answer
@@ -122,16 +148,15 @@ function App() {
 
     return (
       <MainContainer isFocused={isFocused}>
-        <ContextOverlay
-          query={contextData.query}
-          answer={finalAnswer}
-          sections={contextData.sections || []}
-          citations={contextData.citations || []}
-          voiceContext={contextData.voiceContext}
-          isLiveVoice={isLive}
-          onClose={handleCloseWindow}
-          onMinimize={handleMinimizeWindow}
-        />
+          <ContextOverlay
+            query={contextData.query}
+            answer={finalAnswer}
+            sections={contextData.sections || []}
+            citations={contextData.citations || []}
+            voiceContext={contextData.voiceContext}
+            isLiveVoice={isLive}
+            onMinimize={handleMinimizeWindow}
+          />
       </MainContainer>
     );
   }
@@ -140,12 +165,22 @@ function App() {
     return (
       <MainContainer isFocused={isFocused}>
         <NeuralCenter
-          selectedProvider={settings.selectedProvider}
-          onSelectProvider={setSelectedProvider}
-          cpuLoad={settings.cpuLoad}
-          activePlugins={settings.activePlugins}
-          onTogglePlugin={togglePlugin}
-          onClose={handleCloseWindow}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          onResetSettings={resetSettingsState}
+          onClearMemory={clearMemory}
+          onMinimize={handleMinimizeWindow}
+        />
+      </MainContainer>
+    );
+  }
+
+  if (windowType === "history") {
+    return (
+      <MainContainer isFocused={isFocused}>
+        <ContextHistory
+          refreshToken={historyRefreshToken}
+          onOpenContext={openHistoryItem}
           onMinimize={handleMinimizeWindow}
         />
       </MainContainer>
@@ -159,60 +194,64 @@ function App() {
         onDismiss={() => setErrorMessage(null)}
       />
 
-      {viewMode === "collapsed" && (
-        <Header
-          isProcessing={isProcessing}
-          interactionCount={interactionCount}
-        />
-      )}
+      <div ref={searchContentRef} className="relative">
+        {viewMode === "collapsed" && (
+          <Header
+            isProcessing={isProcessing}
+            interactionCount={interactionCount}
+          />
+        )}
 
-      <SearchBar
-        inputValue={inputValue}
-        onInputChange={handleInputChange}
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}
-        isProcessing={isProcessing}
-        inputRef={inputRef}
+        <SearchBar
+          inputValue={inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
+          isProcessing={isProcessing}
+          inputRef={inputRef}
         onCopyToClipboard={copyToClipboard}
         onClearInput={clearInput}
-        onSearchWeb={searchWeb}
         onShowSettings={showSettings}
-        onQuickAction={quickAction}
-        micStatus={micStatus}
-        screenStatus={screenStatus}
-        onToggleScreenVision={toggleScreenVision}
-        onToggleMicrophone={toggleMicrophone}
-        isTranscribing={isTranscribing}
-        permissionDenied={permissionDenied}
-        chunksProcessed={chunksProcessed}
-      />
+        onShowHistory={showHistory}
+          micStatus={micStatus}
+          screenStatus={screenStatus}
+          onToggleScreenVision={toggleScreenVision}
+          onToggleMicrophone={toggleMicrophone}
+          isTranscribing={isTranscribing}
+          permissionDenied={permissionDenied}
+          chunksProcessed={chunksProcessed}
+          onHeightChange={setSearchContentHeight}
+        />
 
-      {windowType === "single" && (
-        <div className="relative">
-          {viewMode === "context" && (
-            <ContextOverlay
-              query={liveVoiceContext?.isLive ? "Contexto de Voz Ao Vivo" : (mockData?.query || "Query")}
-              answer={liveVoiceContext?.isLive ? (liveVoiceContext.text || "") : (mockData?.answer || "No response")}
-              sections={liveVoiceContext?.isLive ? [] : (mockData?.sections || [])}
-              citations={liveVoiceContext?.isLive ? [] : (mockData?.citations || [])}
-              voiceContext={liveVoiceContext}
-              isLiveVoice={liveVoiceContext?.isLive || false}
-            />
-          )}
+        {windowType === "single" && viewMode === "context" && (
+          <ContextOverlay
+            query={liveVoiceContext?.isLive ? "Contexto de Voz Ao Vivo" : (mockData?.query || "Query")}
+            answer={liveVoiceContext?.isLive ? (liveVoiceContext.text || "") : (mockData?.answer || "No response")}
+            sections={liveVoiceContext?.isLive ? [] : (mockData?.sections || [])}
+            citations={liveVoiceContext?.isLive ? [] : (mockData?.citations || [])}
+            voiceContext={liveVoiceContext}
+            isLiveVoice={liveVoiceContext?.isLive || false}
+          />
+        )}
 
-          {viewMode === "settings" && (
-            <NeuralCenter
-              selectedProvider={settings.selectedProvider}
-              onSelectProvider={setSelectedProvider}
-              cpuLoad={settings.cpuLoad}
-              activePlugins={settings.activePlugins}
-              onTogglePlugin={togglePlugin}
-            />
-          )}
-        </div>
-      )}
+        {windowType === "single" && viewMode === "settings" && (
+          <NeuralCenter
+            settings={settings}
+            onUpdateSettings={updateSettings}
+            onResetSettings={resetSettingsState}
+            onClearMemory={clearMemory}
+          />
+        )}
 
-      {viewMode === "collapsed" && <Footer />}
+        {viewMode === "history" && windowType === "single" && (
+          <ContextHistory
+            refreshToken={historyRefreshToken}
+            onOpenContext={openHistoryItem}
+          />
+        )}
+
+        {viewMode === "collapsed" && <Footer />}
+      </div>
     </MainContainer>
   );
 }

@@ -5,7 +5,7 @@ import { DEFAULT_LANGUAGE } from "../../../shared/audio/constants.js";
 import { sanitizeTranscriptionText } from "../../../shared/audio/transcription.js";
 import { isElectron, saveTranscription, transcribeAudio } from "../../infra/ipc/electronBridge.js";
 
-export const useMicTranscription = () => {
+export const useMicTranscription = ({ autoSaveTranscription = true, audioSettings } = {}) => {
   const [isListening, setIsListening] = useState(false);
   const [transcription, setTranscription] = useState("");
   const [fullTranscription, setFullTranscription] = useState("");
@@ -26,7 +26,7 @@ export const useMicTranscription = () => {
     setTranscription(cleanedText);
     setChunksProcessed(prev => prev + 1);
 
-    if (isElectron()) {
+    if (isElectron() && autoSaveTranscription) {
       await saveTranscription({
         text: cleanedText,
         metadata: {
@@ -68,6 +68,8 @@ export const useMicTranscription = () => {
       pipelineRef.current = createMicTranscriptionPipeline({
         sampleRate,
         language: DEFAULT_LANGUAGE,
+        silenceThreshold: audioSettings?.silenceThreshold,
+        silenceMs: audioSettings?.silenceMs,
         transcribe: async (audioBuffer, options) => {
           return await transcribeAudio({ audioBuffer, options });
         },

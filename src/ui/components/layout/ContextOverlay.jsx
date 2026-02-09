@@ -134,7 +134,7 @@ const MarkdownRenderer = ({ content }) => {
   );
 };
 
-const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceContext, isLiveVoice, onClose, onMinimize }) => {
+const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceContext, isLiveVoice, onMinimize }) => {
   
   // Debug logs
   console.log('ContextOverlay render:', { isLiveVoice, hasVoiceContext: !!voiceContext, voiceText: voiceContext?.text });
@@ -167,7 +167,7 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceCon
 
   return (
     <div
-      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
+      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[620px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
       style={{ WebkitAppRegion: 'no-drag' }}
     >
       {/* Header */}
@@ -187,16 +187,6 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceCon
               title="Minimizar"
             >
               <FiMinus className="w-4 h-4" />
-            </button>
-          )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Fechar"
-              title="Fechar"
-            >
-              <FiX className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -373,7 +363,6 @@ ContextOverlay.propTypes = {
     source: PropTypes.oneOf(['mic', 'system'])
   }),
   isLiveVoice: PropTypes.bool,
-  onClose: PropTypes.func,
   onMinimize: PropTypes.func
 };
 

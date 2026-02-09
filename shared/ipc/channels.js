@@ -28,6 +28,21 @@ export const CHANNELS = {
     TRANSCRIPTION_EVENT: "system-transcription",
     PROCESSING_EVENT: "system-transcription-status"
   },
+  SETTINGS: {
+    GET: "settings-get",
+    SAVE: "settings-save",
+    RESET: "settings-reset"
+  },
+  MEMORY: {
+    CLEAR_ALL: "memory-clear-all"
+  },
+  CONTEXT_HISTORY: {
+    LIST: "context-history-list",
+    GET: "context-history-get",
+    SAVE: "context-history-save",
+    FAVORITE: "context-history-favorite",
+    DELETE: "context-history-delete"
+  },
   DESKTOP_CAPTURE: {
     GET_SOURCES: "get-desktop-sources"
   }

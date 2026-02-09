@@ -1,32 +1,58 @@
-import PropTypes from 'prop-types';
-import { FiCpu, FiDatabase, FiLock, FiToggleLeft, FiToggleRight, FiZap, FiX, FiMinus } from 'react-icons/fi';
+import PropTypes from "prop-types";
+import { useState } from "react";
+import {
+  FiCpu,
+  FiMic,
+  FiSliders,
+  FiDatabase,
+  FiRefreshCcw,
+  FiTrash2,
+  FiMinus
+} from "react-icons/fi";
 
-const NeuralCenter = ({ 
-  selectedProvider, 
-  onSelectProvider,
-  cpuLoad,
-  activePlugins,
-  onTogglePlugin,
-  onClose,
+const modelOptions = [
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" }
+];
+
+const inputOptions = [
+  { value: "both", label: "Microfone + Sistema" },
+  { value: "mic", label: "Somente microfone" },
+  { value: "system", label: "Somente sistema" }
+];
+
+const NeuralCenter = ({
+  settings,
+  onUpdateSettings,
+  onResetSettings,
+  onClearMemory,
   onMinimize
 }) => {
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const handleClearMemory = async () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 4000);
+      return;
+    }
+    setConfirmClear(false);
+    await onClearMemory?.();
+  };
+
+  const updateAudio = (patch) => onUpdateSettings?.({ audio: patch });
+  const updateAi = (patch) => onUpdateSettings?.({ ai: patch });
+  const updateMemory = (patch) => onUpdateSettings?.({ memory: patch });
+
   return (
-    <div
-      className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300"
-      style={{ WebkitAppRegion: 'no-drag' }}
-    >
-      
-      {/* Header */}
-      <div
-        className="flex items-center justify-between mb-6 border-b border-white/10 pb-2"
-        style={{ WebkitAppRegion: 'drag' }}
-      >
+    <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[620px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent" style={{ WebkitAppRegion: "no-drag" }}>
+      <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" style={{ WebkitAppRegion: "drag" }}>
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-          <FiZap className="text-purple-500" />
-          Neural Center
+          <FiSliders className="text-purple-400" />
+          Settings
         </h2>
-        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' }}>
-          <span className="text-[10px] text-gray-500 font-mono">SYS.READY</span>
+        <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" }}>
+          <span className="text-[10px] text-gray-500 font-mono">SYS.CONFIG</span>
           {onMinimize && (
             <button
               onClick={onMinimize}
@@ -37,128 +63,166 @@ const NeuralCenter = ({
               <FiMinus className="w-4 h-4" />
             </button>
           )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Fechar"
-              title="Fechar"
-            >
-              <FiX className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        
-        {/* 1. Model Selector Card */}
-        <div className="col-span-2 bg-white/5 rounded-xl p-4 border border-white/10">
-          <label className="text-[10px] font-bold text-gray-500 uppercase block mb-3">Active Model</label>
-          <div className="grid grid-cols-3 gap-2">
-            <ModelCard 
-              name="Gemini Pro" 
-              provider="Google"
-              isActive={selectedProvider === 'gemini'} 
-              onClick={() => onSelectProvider('gemini')}
+      <div className="grid grid-cols-1 gap-4">
+        <section className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-300 uppercase mb-3">
+            <FiMic className="w-3 h-3" /> Audio
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-gray-400 col-span-2">Fonte de entrada</label>
+            <select
+              value={settings.audio?.inputDevice || "both"}
+              onChange={(e) => updateAudio({ inputDevice: e.target.value })}
+              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
+            >
+              {inputOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
+            <label className="text-xs text-gray-400 col-span-2">Sensibilidade de silencio</label>
+            <input
+              type="range"
+              min="0.001"
+              max="0.05"
+              step="0.001"
+              value={settings.audio?.silenceThreshold ?? 0.01}
+              onChange={(e) => updateAudio({ silenceThreshold: Number(e.target.value) })}
+              className="col-span-2"
             />
-            <ModelCard 
-              name="GPT-4o" 
-              provider="OpenAI"
-              isActive={selectedProvider === 'openai'} 
-              onClick={() => onSelectProvider('openai')}
+            <div className="text-[10px] text-gray-500 col-span-2">
+              Threshold atual: {Number(settings.audio?.silenceThreshold ?? 0.01).toFixed(3)}
+            </div>
+
+            <label className="text-xs text-gray-400 col-span-2">Silencio minimo (ms)</label>
+            <input
+              type="range"
+              min="200"
+              max="2500"
+              step="50"
+              value={settings.audio?.silenceMs ?? 700}
+              onChange={(e) => updateAudio({ silenceMs: Number(e.target.value) })}
+              className="col-span-2"
             />
-            <ModelCard 
-              name="Llama 3" 
-              provider="Local"
-              isActive={selectedProvider === 'local'} 
-              onClick={() => onSelectProvider('local')}
-              isLocal
+            <div className="text-[10px] text-gray-500 col-span-2">
+              {settings.audio?.silenceMs ?? 700} ms
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-300 uppercase mb-3">
+            <FiCpu className="w-3 h-3" /> IA
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-gray-400 col-span-2">Provider</label>
+            <select
+              value={settings.ai?.provider || "gemini"}
+              onChange={(e) => updateAi({ provider: e.target.value })}
+              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
+            >
+              <option value="gemini">Gemini</option>
+            </select>
+
+            <label className="text-xs text-gray-400 col-span-2">Modelo</label>
+            <select
+              value={settings.ai?.model || "gemini-2.5-flash"}
+              onChange={(e) => updateAi({ model: e.target.value })}
+              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
+            >
+              {modelOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
+            <label className="text-xs text-gray-400 col-span-2">Temperatura</label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={settings.ai?.temperature ?? 0.7}
+              onChange={(e) => updateAi({ temperature: Number(e.target.value) })}
+              className="col-span-2"
+            />
+            <div className="text-[10px] text-gray-500 col-span-2">
+              {Number(settings.ai?.temperature ?? 0.7).toFixed(2)}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-300 uppercase mb-3">
+            <FiDatabase className="w-3 h-3" /> Memoria
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-gray-400 col-span-2">Auto salvar transcricao</label>
+            <button
+              onClick={() => updateMemory({ autoSaveTranscription: !settings.memory?.autoSaveTranscription })}
+              className="col-span-2 text-left bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
+            >
+              {settings.memory?.autoSaveTranscription ? "Ativo" : "Desativado"}
+            </button>
+
+            <label className="text-xs text-gray-400 col-span-2">Retencao (dias)</label>
+            <input
+              type="number"
+              min="1"
+              max="365"
+              value={settings.memory?.retentionDays ?? 30}
+              onChange={(e) => updateMemory({ retentionDays: Number(e.target.value) })}
+              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
+            />
+
+            <label className="text-xs text-gray-400 col-span-2">Maximo de itens</label>
+            <input
+              type="number"
+              min="50"
+              max="5000"
+              value={settings.memory?.maxItems ?? 500}
+              onChange={(e) => updateMemory({ maxItems: Number(e.target.value) })}
+              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
             />
           </div>
-        </div>
 
-        {/* 2. Hardware Stats */}
-        <div className="col-span-1 bg-white/5 rounded-xl p-4 border border-white/10">
-          <label className="text-[10px] font-bold text-gray-500 uppercase block mb-3 flex items-center gap-2">
-            <FiCpu className="w-3 h-3" /> System Load
-          </label>
-          
-          <div className="space-y-3">
-             {/* Simulação de barra de CPU */}
-             <div>
-               <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                 <span>CPU ({cpuLoad}%)</span>
-                 <span>Normal</span>
-               </div>
-               <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
-                 <div 
-                    className={`h-full rounded-full transition-all duration-500 ${cpuLoad > 80 ? 'bg-red-500' : 'bg-green-500'}`} 
-                    style={{ width: `${cpuLoad}%` }}
-                 />
-               </div>
-             </div>
-             <div>
-               <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                 <span>VRAM (4.2GB)</span>
-                 <span>Using Shared</span>
-               </div>
-               <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
-                 <div className="h-full bg-purple-500/50 w-[40%] rounded-full" />
-               </div>
-             </div>
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              onClick={handleClearMemory}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs border transition-colors ${
+                confirmClear
+                  ? "border-red-400 text-red-300 bg-red-500/10"
+                  : "border-white/10 text-gray-300 bg-black/40 hover:bg-white/10"
+              }`}
+            >
+              <FiTrash2 className="w-3 h-3" />
+              {confirmClear ? "Confirmar limpeza total" : "Limpar memoria (total)"}
+            </button>
+
+            <button
+              onClick={onResetSettings}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs border border-white/10 text-gray-300 bg-black/40 hover:bg-white/10"
+            >
+              <FiRefreshCcw className="w-3 h-3" />
+              Reset settings
+            </button>
           </div>
-        </div>
-
-        {/* 3. MCP Integrations */}
-        <div className="col-span-1 bg-white/5 rounded-xl p-4 border border-white/10">
-           <label className="text-[10px] font-bold text-gray-500 uppercase block mb-3 flex items-center gap-2">
-            <FiDatabase className="w-3 h-3" /> MCP Plugins
-          </label>
-          <div className="space-y-2">
-            {activePlugins.map(plugin => (
-              <div key={plugin.id} className="flex items-center justify-between group">
-                <span className="text-xs text-gray-300">{plugin.name}</span>
-                <button onClick={() => onTogglePlugin(plugin.id)} className="text-gray-400 hover:text-white transition-colors">
-                  {plugin.active 
-                    ? <FiToggleRight className="w-5 h-5 text-green-400" /> 
-                    : <FiToggleLeft className="w-5 h-5" />}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
+        </section>
       </div>
     </div>
   );
 };
 
-const ModelCard = ({ name, provider, isActive, onClick, isLocal }) => (
-  <div 
-    onClick={onClick}
-    className={`
-      cursor-pointer p-3 rounded-lg border transition-all duration-200 relative overflow-hidden
-      ${isActive ? 'bg-purple-500/10 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-black/20 border-white/5 hover:border-white/20'}
-    `}
-  >
-    <div className={`text-xs font-bold ${isActive ? 'text-white' : 'text-gray-400'}`}>{name}</div>
-    <div className="text-[9px] text-gray-500 mt-1 uppercase tracking-wider">{provider}</div>
-    {isLocal && (
-       <div className="absolute top-1 right-1">
-         <FiLock className="w-3 h-3 text-gray-600" />
-       </div>
-    )}
-  </div>
-);
-
 NeuralCenter.propTypes = {
-  selectedProvider: PropTypes.string,
-  onSelectProvider: PropTypes.func,
-  cpuLoad: PropTypes.number,
-  activePlugins: PropTypes.array,
-  onTogglePlugin: PropTypes.func,
-  onClose: PropTypes.func,
+  settings: PropTypes.object.isRequired,
+  onUpdateSettings: PropTypes.func,
+  onResetSettings: PropTypes.func,
+  onClearMemory: PropTypes.func,
   onMinimize: PropTypes.func
 };
 

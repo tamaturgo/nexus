@@ -1,10 +1,10 @@
 import { askAI, isElectron } from "../../infra/ipc/electronBridge.js";
 
-export const askAi = async (prompt) => {
+export const askAi = async (prompt, options = {}) => {
   if (isElectron()) {
     try {
       console.log("Asking AI via Electron:", prompt);
-      const result = await askAI(prompt);
+      const result = await askAI({ prompt, options });
       return result;
     } catch (error) {
       console.error("Error calling AI via Electron:", error);

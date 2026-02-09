@@ -15,7 +15,7 @@ import {
   transcribeAudio
 } from "../../infra/ipc/electronBridge.js";
 
-export const useSystemTranscription = () => {
+export const useSystemTranscription = ({ audioSettings } = {}) => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -95,6 +95,8 @@ export const useSystemTranscription = () => {
     fallbackPipelineRef.current = createMicTranscriptionPipeline({
       sampleRate,
       language: DEFAULT_LANGUAGE,
+      silenceThreshold: audioSettings?.silenceThreshold,
+      silenceMs: audioSettings?.silenceMs,
       transcribe: async (audioBuffer, options) => {
         return await transcribeAudio({ audioBuffer, options });
       },
@@ -123,12 +125,16 @@ export const useSystemTranscription = () => {
     isCapturingRef.current = true;
     setIsCapturing(true);
     setError(null);
-  }, []);
+  }, [audioSettings, clearFallbackTimer]);
 
   const startCapture = useCallback(async (options = {}) => {
     if (!isElectron() || isCapturingRef.current) return;
 
-    const response = await startSystemCapture(options);
+    const response = await startSystemCapture({
+      ...options,
+      silenceThreshold: audioSettings?.silenceThreshold,
+      silenceMs: audioSettings?.silenceMs
+    });
     if (response?.started) {
       isCapturingRef.current = true;
       setIsCapturing(true);
@@ -163,7 +169,7 @@ export const useSystemTranscription = () => {
     if (response?.message) {
       setError(response.message);
     }
-  }, [startDesktopFallback]);
+  }, [audioSettings, startDesktopFallback]);
 
   const stopCapture = useCallback(async () => {
     if (!isElectron() || !isCapturingRef.current) return;
