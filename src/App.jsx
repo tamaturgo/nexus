@@ -1,48 +1,56 @@
-import { useState, useEffect } from 'react';
-import { Header, Footer, SearchBar, MainContainer } from './components';
-import ContextOverlay from './components/layout/ContextOverlay';
-import NeuralCenter from './components/layout/NeuralCenter';
-import ErrorToast from './components/common/ErrorToast';
-import { useAssistant } from './hooks/useAssistant';
+import { useState, useEffect } from "react";
+import { Header, Footer, SearchBar, MainContainer } from "./ui/components";
+import ContextOverlay from "./ui/components/layout/ContextOverlay";
+import NeuralCenter from "./ui/components/layout/NeuralCenter";
+import ErrorToast from "./ui/components/common/ErrorToast";
+import { useAssistant } from "./ui/hooks/useAssistant";
+import {
+  isElectron as bridgeIsElectron,
+  getWindowType,
+  getContextData,
+  onContextData,
+  closeCurrentWindow,
+  minimizeCurrentWindow
+} from "./infra/ipc/electronBridge.js";
 
 function App() {
-  const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+  const isElectron = bridgeIsElectron();
   const windowType = isElectron
-    ? (window.electronAPI?.getWindowType?.()
-        || new URLSearchParams(window.location.search).get('window')
-        || 'search')
-    : 'single';
+    ? (getWindowType()
+        || new URLSearchParams(window.location.search).get("window")
+        || "search")
+    : "single";
 
   const handleCloseWindow = () => {
-    if (isElectron && window.electronAPI?.closeCurrentWindow) {
-      window.electronAPI.closeCurrentWindow();
+    if (isElectron) {
+      closeCurrentWindow();
     }
   };
 
   const handleMinimizeWindow = () => {
-    if (isElectron && window.electronAPI?.minimizeCurrentWindow) {
-      window.electronAPI.minimizeCurrentWindow();
+    if (isElectron) {
+      minimizeCurrentWindow();
     }
   };
 
   const [contextData, setContextData] = useState({
-    query: '',
-    answer: '',
+    query: "",
+    answer: "",
     sections: [],
     citations: [],
     voiceContext: null
   });
 
   useEffect(() => {
-    if (windowType !== 'context' || !isElectron) return;
+    if (windowType !== "context" || !isElectron) return;
     let isMounted = true;
 
-    window.electronAPI?.getContextData?.().then((data) => {
+    getContextData()?.then((data) => {
       if (!isMounted || !data) return;
       setContextData(data);
     });
 
-    const unsubscribe = window.electronAPI?.onContextData?.((data) => {
+    const unsubscribe = onContextData?.((data) => {
       if (!data) return;
       setContextData(data);
     });
@@ -70,7 +78,6 @@ function App() {
     screenStatus,
     toggleScreenVision,
     toggleMicrophone,
-    transcription,
     isTranscribing,
     voiceError,
     permissionDenied,
@@ -86,11 +93,10 @@ function App() {
   const [isFocused, setIsFocused] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Monitorar erros de voz
   useEffect(() => {
     if (voiceError) {
       setErrorMessage(voiceError);
-      setTimeout(() => setErrorMessage(null), 5000); // Auto-dismiss após 5s
+      setTimeout(() => setErrorMessage(null), 5000);
     }
   }, [voiceError]);
 
@@ -98,26 +104,24 @@ function App() {
     const handleFocus = () => setIsFocused(true);
     const handleBlur = () => setIsFocused(false);
 
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
     };
   }, []);
 
-  if (windowType === 'context') {
-    // Ensure answer is a string before passing to ContextOverlay
-    const finalAnswer = typeof contextData.answer === 'string' 
-      ? contextData.answer 
+  if (windowType === "context") {
+    const finalAnswer = typeof contextData.answer === "string"
+      ? contextData.answer
       : (contextData.answer?.answer || JSON.stringify(contextData.answer || ""));
 
-    // Detectar se é contexto de voz ao vivo
     const isLive = contextData.voiceContext?.isLive || false;
 
     return (
-      <MainContainer isFocused={true}>
+      <MainContainer isFocused={isFocused}>
         <ContextOverlay
           query={contextData.query}
           answer={finalAnswer}
@@ -132,9 +136,9 @@ function App() {
     );
   }
 
-  if (windowType === 'settings') {
+  if (windowType === "settings") {
     return (
-      <MainContainer isFocused={true}>
+      <MainContainer isFocused={isFocused}>
         <NeuralCenter
           selectedProvider={settings.selectedProvider}
           onSelectProvider={setSelectedProvider}
@@ -150,21 +154,18 @@ function App() {
 
   return (
     <MainContainer isFocused={isFocused}>
-      {/* Error Toast */}
-      <ErrorToast 
-        message={errorMessage} 
-        onDismiss={() => setErrorMessage(null)} 
+      <ErrorToast
+        message={errorMessage}
+        onDismiss={() => setErrorMessage(null)}
       />
 
-      {/* Header */}
-      {viewMode === 'collapsed' && (
+      {viewMode === "collapsed" && (
         <Header
           isProcessing={isProcessing}
           interactionCount={interactionCount}
         />
       )}
 
-      {/* Search Bar (Always Visible) */}
       <SearchBar
         inputValue={inputValue}
         onInputChange={handleInputChange}
@@ -186,11 +187,9 @@ function App() {
         chunksProcessed={chunksProcessed}
       />
 
-      {/* Dynamic Content Views (Single Window Mode) */}
-      {windowType === 'single' && (
+      {windowType === "single" && (
         <div className="relative">
-          {/* Context Overlay View */}
-          {viewMode === 'context' && (
+          {viewMode === "context" && (
             <ContextOverlay
               query={liveVoiceContext?.isLive ? "Contexto de Voz Ao Vivo" : (mockData?.query || "Query")}
               answer={liveVoiceContext?.isLive ? (liveVoiceContext.text || "") : (mockData?.answer || "No response")}
@@ -201,8 +200,7 @@ function App() {
             />
           )}
 
-          {/* Neural Center (Settings) View */}
-          {viewMode === 'settings' && (
+          {viewMode === "settings" && (
             <NeuralCenter
               selectedProvider={settings.selectedProvider}
               onSelectProvider={setSelectedProvider}
@@ -214,8 +212,7 @@ function App() {
         </div>
       )}
 
-      {/* Footer (Only in collapsed mode) */}
-      {viewMode === 'collapsed' && <Footer />}
+      {viewMode === "collapsed" && <Footer />}
     </MainContainer>
   );
 }

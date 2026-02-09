@@ -1,0 +1,86 @@
+import { AudioChunker } from "../../../shared/audio/chunker.js";
+import { downsampleFloat32 } from "../../../shared/audio/signal.js";
+import { encodeWav } from "../../../shared/audio/wav.js";
+import { DEFAULT_LANGUAGE, MIC_CHUNK_OPTIONS, TARGET_SAMPLE_RATE } from "../../../shared/audio/constants.js";
+
+export const createMicTranscriptionPipeline = ({
+  sampleRate,
+  transcribe,
+  onTranscription,
+  onError,
+  onProcessingChange,
+  language = DEFAULT_LANGUAGE
+}) => {
+  const chunker = new AudioChunker({
+    sampleRate,
+    silenceThreshold: MIC_CHUNK_OPTIONS.silenceThreshold,
+    silenceMs: MIC_CHUNK_OPTIONS.silenceMs,
+    maxChunkMs: MIC_CHUNK_OPTIONS.maxChunkMs,
+    minChunkMs: MIC_CHUNK_OPTIONS.minChunkMs
+  });
+
+  let processing = false;
+  const queue = [];
+  let chunkIndex = 0;
+
+  const emitProcessing = () => {
+    if (onProcessingChange) {
+      onProcessingChange(processing || queue.length > 0);
+    }
+  };
+
+  const processQueue = async () => {
+    if (processing) return;
+    processing = true;
+    emitProcessing();
+
+    while (queue.length) {
+      const item = queue.shift();
+      try {
+        const downsampled = downsampleFloat32(item.samples, sampleRate, TARGET_SAMPLE_RATE);
+        const wavBytes = encodeWav(downsampled, TARGET_SAMPLE_RATE, 1);
+        const result = await transcribe(wavBytes, { language });
+
+        if (result?.text && result.text.trim().length > 0) {
+          onTranscription?.({
+            ...result,
+            chunkIndex: item.chunkIndex,
+            timestamp: item.timestamp,
+            durationMs: item.durationMs,
+            reason: item.reason
+          });
+        }
+      } catch (error) {
+        onError?.(error);
+      }
+    }
+
+    processing = false;
+    emitProcessing();
+  };
+
+  const enqueueChunk = (chunk) => {
+    queue.push({
+      ...chunk,
+      chunkIndex: chunkIndex += 1,
+      timestamp: Date.now()
+    });
+
+    processQueue();
+  };
+
+  return {
+    handlePcmChunk(pcmChunk) {
+      const ready = chunker.push(pcmChunk);
+      if (ready) {
+        enqueueChunk(ready);
+      }
+    },
+    flush({ force = false, reason = "stop" } = {}) {
+      const ready = chunker.flush({ force, reason });
+      if (ready) {
+        enqueueChunk(ready);
+      }
+    }
+  };
+};

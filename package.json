@@ -51,7 +51,8 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "shared/**/*"
     ],
     "win": {
       "target": [
@@ -60,3 +61,4 @@
     }
   }
 }
+
