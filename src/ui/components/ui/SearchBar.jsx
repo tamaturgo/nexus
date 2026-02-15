@@ -38,7 +38,6 @@ const SearchBar = ({
   onHeightChange
 }) => {
   const [placeholder, setPlaceholder] = useState("Ask me anything...");
-  const [isTyping, setIsTyping] = useState(false);
   const containerRef = useRef(null);
   
   useEffect(() => {
@@ -75,7 +74,7 @@ const SearchBar = ({
     onSubmit(e);
   };
 
-  const showQuickIcons = !isTyping && !inputValue;
+  const hasInput = inputValue.length > 0;
 
   return (
     <div className="relative" style={{ WebkitAppRegion: 'drag' }}>
@@ -87,8 +86,6 @@ const SearchBar = ({
               value={inputValue}
               onChange={onInputChange}
               onKeyDown={onKeyDown}
-              onFocus={() => setIsTyping(true)}
-              onBlur={() => setIsTyping(false)}
               inputRef={inputRef}
               placeholder={placeholder}
               icon={() => <Waveform isActive={micStatus} />}
@@ -101,15 +98,13 @@ const SearchBar = ({
             className="flex items-center gap-1 pt-1 ml-auto justify-end min-w-[200px]"
             style={{ WebkitAppRegion: 'no-drag' }}
           >
-            {showQuickIcons && (
-              <ActionButton
-                onClick={onToggleScreenVision}
-                title={screenStatus ? "Vision On" : "Vision Off"}
-                className={screenStatus ? "text-green-400" : "text-gray-400"}
-              >
-                {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
-              </ActionButton>
-            )}
+            <ActionButton
+              onClick={onToggleScreenVision}
+              title={screenStatus ? "Vision On" : "Vision Off"}
+              className={screenStatus ? "text-green-400" : "text-gray-400"}
+            >
+              {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
+            </ActionButton>
             
             {/* Microphone Toggle */}
             <ActionButton
@@ -132,18 +127,25 @@ const SearchBar = ({
               <FiMic className="w-4 h-4" />
             </ActionButton>
             
-            {showQuickIcons && <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />}
+            <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />
 
-            {inputValue && (
-              <ActionButton
-                onClick={onCopyToClipboard}
-                title="Copiar"
-              >
-                <FiClipboard className="w-4 h-4" />
-              </ActionButton>
-            )}
+            {hasInput ? (
+              <>
+                <ActionButton
+                  onClick={onCopyToClipboard}
+                  title="Copiar"
+                >
+                  <FiClipboard className="w-4 h-4" />
+                </ActionButton>
 
-            {showQuickIcons && (
+                <ActionButton
+                  onClick={onClearInput}
+                  title="Limpar"
+                >
+                  <FiX className="w-4 h-4" />
+                </ActionButton>
+              </>
+            ) : (
               <>
                 <ActionButton
                   onClick={onShowSettings}
@@ -163,16 +165,7 @@ const SearchBar = ({
               </>
             )}
 
-            {inputValue && (
-              <ActionButton
-                onClick={onClearInput}
-                title="Limpar"
-              >
-                <FiX className="w-4 h-4" />
-              </ActionButton>
-            )}
-
-            {showQuickIcons && <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />}
+            <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />
 
             <ActionButton
               onClick={handleSubmit}

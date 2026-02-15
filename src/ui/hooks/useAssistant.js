@@ -185,6 +185,7 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
 
     try {
       const response = await askAi(queryText, {
+        provider: settingsState.ai?.provider,
         model: settingsState.ai?.model,
         temperature: settingsState.ai?.temperature
       });
@@ -310,9 +311,51 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
   };
 
   const clearMemory = async () => {
-    if (isElectron) {
-      await clearAllMemory?.();
-      setSettingsState({ ...DEFAULT_SETTINGS });
+    if (!isElectron) {
+      const message = "Limpeza de memoria disponivel apenas no app Electron.";
+      console.warn("[Memory] clearAll skipped:", message);
+      return { ok: false, message };
+    }
+
+    const startedAt = Date.now();
+    console.info("[Memory] clearAll requested");
+
+    try {
+      const result = await clearAllMemory?.();
+      const durationMs = Date.now() - startedAt;
+      const ok = !!(result && (result.ok === true || result.cleared === true));
+
+      if (ok) {
+        setSettingsState({ ...DEFAULT_SETTINGS });
+      }
+
+      const summary = {
+        ok,
+        cleared: ok,
+        durationMs,
+        details: result?.details || null
+      };
+
+      if (ok) {
+        console.info("[Memory] clearAll completed:", summary);
+        return {
+          ...summary,
+          message: "Memoria limpa com sucesso."
+        };
+      }
+
+      console.warn("[Memory] clearAll returned incomplete result:", result);
+      return {
+        ...summary,
+        message: result?.message || "A limpeza nao foi concluida por completo."
+      };
+    } catch (error) {
+      console.error("[Memory] clearAll failed:", error);
+      return {
+        ok: false,
+        cleared: false,
+        message: error?.message || "Erro inesperado ao limpar memoria."
+      };
     }
   };
 

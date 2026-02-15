@@ -13,6 +13,55 @@ export class LanceDbVectorStore {
     this.dbPath = path.join(app.getPath('userData'), 'nexus-memory');
   }
 
+  async tryOpenExistingTable() {
+    const existingTables = await this.db.tableNames();
+    if (!existingTables.includes(this.tableName)) {
+      this.table = null;
+      return false;
+    }
+
+    try {
+      this.table = await this.db.openTable(this.tableName);
+      return true;
+    } catch (error) {
+      console.warn('LanceDbVectorStore: Failed to open existing table. Will recreate on write.', error);
+      this.table = null;
+      return false;
+    }
+  }
+
+  async ensureWritableTable(initialData) {
+    if (this.table) return false;
+
+    const opened = await this.tryOpenExistingTable();
+    if (opened) return false;
+
+    const existingTables = await this.db.tableNames();
+    if (existingTables.includes(this.tableName)) {
+      try {
+        this.table = await this.db.createTable(this.tableName, initialData, { mode: 'overwrite' });
+      } catch (overwriteError) {
+        console.warn('LanceDbVectorStore: Overwrite failed. Trying hard reset of table metadata.', overwriteError);
+        try {
+          await this.db.dropTable(this.tableName);
+        } catch (_dropError) {
+        }
+        try {
+          const tablePath = path.join(this.dbPath, `${this.tableName}.lance`);
+          if (fs.existsSync(tablePath)) {
+            fs.rmSync(tablePath, { recursive: true, force: true });
+          }
+        } catch (_fsError) {
+        }
+        this.table = await this.db.createTable(this.tableName, initialData, { mode: 'create' });
+      }
+      return true;
+    }
+
+    this.table = await this.db.createTable(this.tableName, initialData, { mode: 'create' });
+    return true;
+  }
+
   async initialize() {
     try {
       if (!fs.existsSync(this.dbPath)) {
@@ -23,12 +72,7 @@ export class LanceDbVectorStore {
       this.embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
       console.log('LanceDbVectorStore: Model loaded.');
 
-      const existingTables = await this.db.tableNames();
-      
-      if (!existingTables.includes(this.tableName)) {
-      } else {
-        this.table = await this.db.openTable(this.tableName);
-      }
+      await this.tryOpenExistingTable();
       console.log(`LanceDbVectorStore: Service initialized at ${this.dbPath}`);
     } catch (error) {
       console.error('LanceDbVectorStore: Initialization failed:', error);
@@ -45,6 +89,13 @@ export class LanceDbVectorStore {
 
   async addDocument(text, metadata = {}) {
     try {
+      if (!this.db || !this.embedder) {
+        await this.initialize();
+      }
+      if (!this.db || !this.embedder) {
+        throw new Error('LanceDbVectorStore is not initialized');
+      }
+
       const vector = await this.getEmbedding(text);
       
       // Only use basic fields that match the schema
@@ -55,15 +106,8 @@ export class LanceDbVectorStore {
         timestamp: metadata.timestamp || Date.now()
       }];
 
-      if (!this.table) {
-        const existingTables = await this.db.tableNames();
-        if (existingTables.includes(this.tableName)) {
-           this.table = await this.db.openTable(this.tableName);
-           await this.table.add(data);
-        } else {
-           this.table = await this.db.createTable(this.tableName, data);
-        }
-      } else {
+      const createdWithInitialData = await this.ensureWritableTable(data);
+      if (!createdWithInitialData) {
         await this.table.add(data);
       }
       
@@ -75,17 +119,41 @@ export class LanceDbVectorStore {
     }
   }
 
-  async search(queryText, limit = 5) {
+  async search(queryText, limit = 5, options = {}) {
     try {
+      if (!this.db || !this.embedder) {
+        await this.initialize();
+      }
+      if (!this.db || !this.embedder) {
+        return [];
+      }
+
+      if (!this.table) {
+        await this.tryOpenExistingTable();
+      }
       if (!this.table) return [];
       
       const queryVector = await this.getEmbedding(queryText);
-      
+      const candidateLimit = Math.max(limit * 4, limit);
+      const includeTypes = Array.isArray(options.includeTypes) ? options.includeTypes : null;
+      const excludeTypes = Array.isArray(options.excludeTypes) ? options.excludeTypes : null;
+
       const results = await this.table.vectorSearch(queryVector)
-        .limit(limit)
+        .limit(candidateLimit)
         .toArray();
-        
-      return results;
+
+      const filtered = results.filter(item => {
+        if (!item || typeof item !== 'object') return false;
+        if (includeTypes && includeTypes.length > 0 && !includeTypes.includes(item.type)) {
+          return false;
+        }
+        if (excludeTypes && excludeTypes.length > 0 && excludeTypes.includes(item.type)) {
+          return false;
+        }
+        return true;
+      });
+
+      return filtered.slice(0, limit);
     } catch (error) {
       console.error('LanceDbVectorStore: Search error:', error);
       return [];
