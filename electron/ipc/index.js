@@ -12,6 +12,7 @@ export const registerHandlers = ({
   windowService,
   assistantService,
   transcriber,
+  realtimeInsightService,
   systemCaptureController,
   settingsStore,
   memoryService,
@@ -20,7 +21,7 @@ export const registerHandlers = ({
   registerWindowHandlers(windowService);
   registerContextHandlers(windowService);
   registerAssistantHandlers(assistantService);
-  registerTranscriptionHandlers(transcriber);
+  registerTranscriptionHandlers(transcriber, realtimeInsightService, windowService);
   registerSystemCaptureHandlers(systemCaptureController, windowService);
   registerDesktopCaptureHandlers();
   registerSettingsHandlers(settingsStore);

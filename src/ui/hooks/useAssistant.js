@@ -39,6 +39,7 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     isListening: micActive,
     transcription: micTranscription,
     fullTranscription: micFullTranscription,
+    latestInsight: micLatestInsight,
     isProcessing: micProcessing,
     error: micError,
     permissionDenied,
@@ -56,6 +57,7 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     error: systemError,
     transcription: systemTranscription,
     fullTranscription: systemFullTranscription,
+    latestInsight: systemLatestInsight,
     chunksProcessed: systemChunks,
     lastEvent: systemLastEvent,
     startCapture: startSystemCapture,
@@ -64,13 +66,14 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
     audioSettings: settingsState.audio
   });
 
-  const updateLiveVoiceContext = useCallback((source, text, chunks, timestamp) => {
+  const updateLiveVoiceContext = useCallback((source, text, chunks, timestamp, insight = null) => {
     const voiceCtx = {
       timestamp: timestamp || Date.now(),
       text,
       chunksProcessed: chunks,
       source,
-      isLive: true
+      isLive: true,
+      insight
     };
 
     if (isElectron) {
@@ -149,14 +152,14 @@ export const useAssistant = ({ windowType = "single", isElectron = false } = {})
 
   useEffect(() => {
     if (!micFullTranscription) return;
-    updateLiveVoiceContext("mic", micFullTranscription, micChunks, Date.now());
-  }, [micFullTranscription, micChunks, updateLiveVoiceContext]);
+    updateLiveVoiceContext("mic", micFullTranscription, micChunks, Date.now(), micLatestInsight || null);
+  }, [micFullTranscription, micChunks, micLatestInsight, updateLiveVoiceContext]);
 
   useEffect(() => {
     if (!systemFullTranscription) return;
     const timestamp = systemLastEvent?.timestamp || Date.now();
-    updateLiveVoiceContext("system", systemFullTranscription, systemChunks, timestamp);
-  }, [systemFullTranscription, systemChunks, systemLastEvent, updateLiveVoiceContext]);
+    updateLiveVoiceContext("system", systemFullTranscription, systemChunks, timestamp, systemLatestInsight || null);
+  }, [systemFullTranscription, systemChunks, systemLastEvent, systemLatestInsight, updateLiveVoiceContext]);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);

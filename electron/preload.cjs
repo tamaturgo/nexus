@@ -25,7 +25,10 @@ try {
       SAVE_TRANSCRIPTION: "save-transcription"
     },
     TRANSCRIPTION: {
-      TRANSCRIBE_AUDIO: "transcribe-audio"
+      TRANSCRIBE_AUDIO: "transcribe-audio",
+      PROCESS_INSIGHT: "transcription-process-insight",
+      RESET_INSIGHT_SESSION: "transcription-reset-insight-session",
+      INSIGHT_EVENT: "transcription-insight"
     },
     SYSTEM_CAPTURE: {
       START: "system-capture-start",
@@ -99,6 +102,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   transcribeAudio: ({ audioBuffer, options }) => {
     return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.TRANSCRIBE_AUDIO, { audioBuffer, options });
+  },
+  processTranscriptionInsight: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.PROCESS_INSIGHT, payload);
+  },
+  resetTranscriptionInsightSession: ({ source }) => {
+    return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.RESET_INSIGHT_SESSION, { source });
+  },
+  onTranscriptionInsight: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on(CHANNELS.TRANSCRIPTION.INSIGHT_EVENT, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.TRANSCRIPTION.INSIGHT_EVENT, handler);
   },
   startSystemCapture: (options) => {
     return ipcRenderer.invoke(CHANNELS.SYSTEM_CAPTURE.START, options);

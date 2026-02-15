@@ -212,31 +212,62 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceCon
             <div className="flex items-center gap-2 mb-3">
               <FiMic className="text-purple-400 w-5 h-5 animate-pulse" />
               <span className="text-sm font-semibold text-purple-300">
-                Transcricao Ao Vivo
+                Insights Ao Vivo
               </span>
-              
+
               {voiceContext?.source && (
                 <span className="ml-auto text-[10px] uppercase tracking-wider text-gray-400">
                   Fonte: {voiceContext.source === "system" ? "Sistema" : "Microfone"}
                 </span>
               )}
             </div>
-            
-            {/* Texto da transcrição com scroll */}
-            <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-transparent">
-              {voiceContext.text ? (
-                <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-                  {voiceContext.text}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400 italic">
-                  Aguardando áudio... Fale no microfone.
-                </p>
-              )}
-            </div>
+
+            {voiceContext?.insight ? (
+              <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-transparent space-y-3">
+                <div className="rounded-md border border-white/10 bg-black/20 p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-purple-300 mb-1">
+                    Comentarios do Modelo
+                  </div>
+                  {Array.isArray(voiceContext.insight.comments) && voiceContext.insight.comments.length > 0 ? (
+                    <ul className="space-y-1">
+                      {voiceContext.insight.comments.slice(-10).reverse().map((comment, index) => (
+                        <li key={`${comment}-${index}`} className="text-sm text-gray-200 leading-relaxed">
+                          - {comment}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">Sem comentarios adicionais no momento.</p>
+                  )}
+                </div>
+
+                <div className="rounded-md border border-white/10 bg-black/20 p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-purple-300 mb-1">
+                    Resumo Evolutivo
+                  </div>
+                  <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap max-h-36 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                    {voiceContext.insight.summary
+                      ? (voiceContext.insight.summary.length > 700
+                          ? `${voiceContext.insight.summary.slice(0, 700)}...`
+                          : voiceContext.insight.summary)
+                      : "Aguardando resumo relevante..."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-transparent">
+                {voiceContext.text ? (
+                  <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                    {voiceContext.text}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">
+                    Aguardando audio... Fale no microfone.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-          
-        
         </div>
       )}
 
@@ -360,13 +391,24 @@ ContextOverlay.propTypes = {
     text: PropTypes.string,
     chunksProcessed: PropTypes.number,
     isLive: PropTypes.bool,
-    source: PropTypes.oneOf(['mic', 'system'])
+    source: PropTypes.oneOf(['mic', 'system']),
+    insight: PropTypes.shape({
+      summary: PropTypes.string,
+      comments: PropTypes.arrayOf(PropTypes.string),
+      rawRecentChunk: PropTypes.string,
+      snapshot: PropTypes.string,
+      displayText: PropTypes.string,
+      insightType: PropTypes.string,
+      relevanceScore: PropTypes.number,
+      timestamp: PropTypes.number
+    })
   }),
   isLiveVoice: PropTypes.bool,
   onMinimize: PropTypes.func
 };
 
 export default ContextOverlay;
+
 
 
 

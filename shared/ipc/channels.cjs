@@ -18,7 +18,10 @@ module.exports = {
       SAVE_TRANSCRIPTION: "save-transcription"
     },
     TRANSCRIPTION: {
-      TRANSCRIBE_AUDIO: "transcribe-audio"
+      TRANSCRIBE_AUDIO: "transcribe-audio",
+      PROCESS_INSIGHT: "transcription-process-insight",
+      RESET_INSIGHT_SESSION: "transcription-reset-insight-session",
+      INSIGHT_EVENT: "transcription-insight"
     },
     SYSTEM_CAPTURE: {
       START: "system-capture-start",

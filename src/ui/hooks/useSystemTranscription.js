@@ -12,8 +12,26 @@ import {
   onSystemTranscriptionStatus,
   onSystemCaptureStatus,
   onSystemCaptureError,
-  transcribeAudio
+  transcribeAudio,
+  processTranscriptionInsight,
+  resetTranscriptionInsightSession,
+  onTranscriptionInsight
 } from "../../infra/ipc/electronBridge.js";
+
+const normalizeComment = (value) => String(value || "").replace(/\s+/g, " ").trim();
+const mergeComments = (previous = [], incoming = [], limit = 14) => {
+  const seen = new Set();
+  const merged = [];
+  for (const entry of [...previous, ...incoming]) {
+    const value = normalizeComment(entry);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(value);
+  }
+  return merged.slice(-limit);
+};
 
 export const useSystemTranscription = ({ audioSettings } = {}) => {
   const [isCapturing, setIsCapturing] = useState(false);
@@ -21,6 +39,7 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
   const [error, setError] = useState(null);
   const [transcription, setTranscription] = useState("");
   const [fullTranscription, setFullTranscription] = useState("");
+  const [latestInsight, setLatestInsight] = useState(null);
   const [chunksProcessed, setChunksProcessed] = useState(0);
   const [lastEvent, setLastEvent] = useState(null);
 
@@ -39,6 +58,57 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
       fallbackTimerRef.current = null;
     }
   }, []);
+
+  const processInsightFromChunk = useCallback(async (payload, source = "system") => {
+    const cleanedText = sanitizeTranscriptionText(payload?.text || "");
+    if (!cleanedText) return;
+    console.log("[SystemTranscription] chunk recebido:", {
+      source,
+      chunkIndex: payload?.chunkIndex,
+      timestamp: payload?.timestamp,
+      text: cleanedText
+    });
+
+    clearFallbackTimer();
+
+    setChunksProcessed(prev => {
+      const next = prev + 1;
+      chunksProcessedRef.current = next;
+      return next;
+    });
+
+    const timestamp = payload?.timestamp || Date.now();
+    const chunkIndex = payload?.chunkIndex;
+
+    try {
+      const insight = await processTranscriptionInsight?.({
+        source,
+        text: cleanedText,
+        timestamp,
+        chunkIndex,
+        durationMs: payload?.durationMs || payload?.duration || 5
+      });
+
+      if (!insight?.relevant || !insight?.displayText) {
+        console.log("[SystemTranscription] insight filtrado:", {
+          source,
+          reason: insight?.reason,
+          relevanceScore: insight?.relevanceScore
+        });
+        setLastEvent({
+          ...payload,
+          source,
+          timestamp,
+          chunkIndex,
+          ignored: true
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("Erro ao processar insight do sistema:", error);
+      setError(error?.message || "Erro ao processar insights em tempo real.");
+    }
+  }, [clearFallbackTimer]);
 
   const startDesktopFallback = useCallback(async () => {
     clearFallbackTimer();
@@ -101,19 +171,8 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
         return await transcribeAudio({ audioBuffer, options });
       },
       onTranscription: (payload) => {
-        const cleanedText = sanitizeTranscriptionText(payload?.text || "");
-        if (!cleanedText) return;
-        setTranscription(cleanedText);
-        setFullTranscription(prev => (prev ? `${prev} ${cleanedText}` : cleanedText));
-        setChunksProcessed(prev => {
-          const next = prev + 1;
-          chunksProcessedRef.current = next;
-          return next;
-        });
-        setLastEvent({
-          ...payload,
-          text: cleanedText,
-          source: "system"
+        processInsightFromChunk(payload, "system").catch((error) => {
+          console.error("Falha no insight do fallback de sistema:", error);
         });
       },
       onError: (err) => setError(err?.message || "Erro ao processar audio do sistema."),
@@ -125,11 +184,16 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
     isCapturingRef.current = true;
     setIsCapturing(true);
     setError(null);
-  }, [audioSettings, clearFallbackTimer]);
+  }, [audioSettings, clearFallbackTimer, processInsightFromChunk]);
 
   const startCapture = useCallback(async (options = {}) => {
     if (!isElectron() || isCapturingRef.current) return;
 
+    setTranscription("");
+    setFullTranscription("");
+    setLatestInsight(null);
+    setChunksProcessed(0);
+    await resetTranscriptionInsightSession?.("system");
     const response = await startSystemCapture({
       ...options,
       silenceThreshold: audioSettings?.silenceThreshold,
@@ -189,23 +253,61 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
     isProcessingRef.current = false;
     setIsCapturing(false);
     setIsProcessing(false);
+    await resetTranscriptionInsightSession?.("system");
+  }, []);
+
+  useEffect(() => {
+    if (!isElectron()) return undefined;
+
+    const offInsight = onTranscriptionInsight?.((payload) => {
+      if (!payload || payload.source !== "system") return;
+      const displayText = payload.displayText || payload.contextSnapshot || "";
+      const summary = payload?.rollingSummary || payload?.summary || "";
+      const incomingComments = Array.isArray(payload?.modelComments) ? payload.modelComments : [];
+      if (!displayText && !summary && incomingComments.length === 0) return;
+
+      const visibleText = displayText || summary;
+      setTranscription(visibleText);
+      setFullTranscription(visibleText);
+      setLatestInsight((previous) => {
+        const previousComments = Array.isArray(previous?.comments) ? previous.comments : [];
+        return {
+          source: payload?.source || "system",
+          summary,
+          comments: mergeComments(previousComments, incomingComments),
+          rawRecentChunk: "",
+          snapshot: payload?.contextSnapshot || previous?.snapshot || "",
+          displayText: payload?.displayText || previous?.displayText || "",
+          insightType: payload?.insightType || previous?.insightType || "",
+          relevanceScore: payload?.relevanceScore || previous?.relevanceScore || 0,
+          timestamp: payload?.timestamp || Date.now()
+        };
+      });
+      console.log("[SystemTranscription] insight relevante exibido:", {
+        source: payload?.source,
+        relevanceScore: payload?.relevanceScore,
+        insightType: payload?.insightType,
+        text: visibleText
+      });
+      setLastEvent({
+        source: payload?.source || "system",
+        text: visibleText,
+        timestamp: payload?.timestamp || Date.now(),
+        insight: payload,
+        isInsight: true
+      });
+    });
+
+    return () => offInsight?.();
   }, []);
 
   useEffect(() => {
     if (!isElectron()) return;
 
     const offTranscription = onSystemTranscription((payload) => {
-      const cleanedText = sanitizeTranscriptionText(payload?.text || "");
-      if (!cleanedText) return;
-      clearFallbackTimer();
-      setTranscription(cleanedText);
-      setFullTranscription(prev => (prev ? `${prev} ${cleanedText}` : cleanedText));
-      setChunksProcessed(prev => {
-        const next = prev + 1;
-        chunksProcessedRef.current = next;
-        return next;
+      processInsightFromChunk(payload, "system").catch((error) => {
+        console.error("Falha no insight de transcricao do sistema:", error);
       });
-      setLastEvent({ ...payload, text: cleanedText });
     });
 
     const offProcessing = onSystemTranscriptionStatus((payload) => {
@@ -243,8 +345,9 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
       offProcessing?.();
       offStatus?.();
       offError?.();
+      resetTranscriptionInsightSession?.("system");
     };
-  }, [clearFallbackTimer, startDesktopFallback]);
+  }, [clearFallbackTimer, processInsightFromChunk, startDesktopFallback]);
 
   return {
     isCapturing,
@@ -252,6 +355,7 @@ export const useSystemTranscription = ({ audioSettings } = {}) => {
     error,
     transcription,
     fullTranscription,
+    latestInsight,
     chunksProcessed,
     lastEvent,
     startCapture,

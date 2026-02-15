@@ -49,6 +49,18 @@ export const transcribeAudio = ({ audioBuffer, options }) => {
   return window.electronAPI?.transcribeAudio?.({ audioBuffer, options });
 };
 
+export const processTranscriptionInsight = (payload) => {
+  return window.electronAPI?.processTranscriptionInsight?.(payload);
+};
+
+export const resetTranscriptionInsightSession = (source) => {
+  return window.electronAPI?.resetTranscriptionInsightSession?.({ source });
+};
+
+export const onTranscriptionInsight = (callback) => {
+  return window.electronAPI?.onTranscriptionInsight?.(callback);
+};
+
 export const startSystemCapture = (options) => {
   return window.electronAPI?.startSystemCapture?.(options);
 };

@@ -8,6 +8,7 @@ import { LanceDbVectorStore } from "./infra/vectorstore/LanceDbVectorStore.js";
 import { WhisperCliTranscriber } from "./infra/transcription/WhisperCliTranscriber.js";
 import { SystemCaptureController } from "./app/audio/SystemCaptureController.js";
 import { AssistantService } from "./app/assistant/AssistantService.js";
+import { RealtimeInsightService } from "./app/transcription/RealtimeInsightService.js";
 import { SettingsStore } from "./app/settings/SettingsStore.js";
 import { MemoryService } from "./app/memory/MemoryService.js";
 import { ConversationMemoryStore } from "./app/memory/ConversationMemoryStore.js";
@@ -27,6 +28,7 @@ const settingsStore = new SettingsStore();
 const conversationMemoryStore = new ConversationMemoryStore(settingsStore);
 const memoryService = new MemoryService(vectorStore, settingsStore, conversationMemoryStore);
 const assistantService = new AssistantService(aiClient, vectorStore, settingsStore, conversationMemoryStore);
+const realtimeInsightService = new RealtimeInsightService(aiClient, settingsStore, assistantService);
 const contextHistoryStore = new ContextHistoryStore();
 
 app.whenReady().then(async () => {
@@ -37,6 +39,7 @@ app.whenReady().then(async () => {
     windowService,
     assistantService,
     transcriber,
+    realtimeInsightService,
     systemCaptureController,
     settingsStore,
     memoryService,
