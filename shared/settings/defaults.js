@@ -1,7 +1,6 @@
 export const DEFAULT_SETTINGS = {
   audio: {
-    inputDevice: "both",
-    systemCaptureMode: "loopback",
+    inputDevice: "mic",
     silenceThreshold: 0.01,
     silenceMs: 700
   },

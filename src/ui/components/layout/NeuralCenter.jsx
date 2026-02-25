@@ -34,18 +34,13 @@ const providerOptions = [
   { value: "gemini", label: "Gemini" }
 ];
 
-const inputOptions = [
-  { value: "both", label: "Microfone + Sistema" },
-  { value: "mic", label: "Somente microfone" },
-  { value: "system", label: "Somente sistema" }
-];
-
 const NeuralCenter = ({
   settings,
   onUpdateSettings,
   onResetSettings,
   onClearMemory,
-  onMinimize
+  onMinimize,
+  fullScreen = false
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearFeedback, setClearFeedback] = useState({ status: "idle", message: "" });
@@ -101,7 +96,12 @@ const NeuralCenter = ({
   };
 
   return (
-    <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[620px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent" style={{ WebkitAppRegion: "no-drag" }}>
+    <div
+      className={`pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent ${
+        fullScreen ? "h-full" : "max-h-[620px]"
+      }`}
+      style={{ WebkitAppRegion: "no-drag" }}
+    >
       <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" style={{ WebkitAppRegion: "drag" }}>
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
           <FiSliders className="text-purple-400" />
@@ -129,16 +129,10 @@ const NeuralCenter = ({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-xs text-gray-400 col-span-2">Fonte de entrada</label>
-            <select
-              value={settings.audio?.inputDevice || "both"}
-              onChange={(e) => updateAudio({ inputDevice: e.target.value })}
-              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
-            >
-              {inputOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <label className="text-xs text-gray-400 col-span-2">Entrada ativa</label>
+            <div className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10">
+              Microfone manual (iniciar/parar no botao da barra)
+            </div>
 
             <label className="text-xs text-gray-400 col-span-2">Sensibilidade de silencio</label>
             <input
@@ -309,7 +303,8 @@ NeuralCenter.propTypes = {
   onUpdateSettings: PropTypes.func,
   onResetSettings: PropTypes.func,
   onClearMemory: PropTypes.func,
-  onMinimize: PropTypes.func
+  onMinimize: PropTypes.func,
+  fullScreen: PropTypes.bool
 };
 
 export default NeuralCenter;

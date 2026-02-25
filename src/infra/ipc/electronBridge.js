@@ -93,6 +93,30 @@ export const clearAllMemory = () => {
   return window.electronAPI?.clearAllMemory?.();
 };
 
+export const listNotes = () => {
+  return window.electronAPI?.listNotes?.();
+};
+
+export const getNote = (noteId) => {
+  return window.electronAPI?.getNote?.(noteId);
+};
+
+export const createNote = (payload) => {
+  return window.electronAPI?.createNote?.(payload);
+};
+
+export const updateNote = (noteId, patch) => {
+  return window.electronAPI?.updateNote?.(noteId, patch);
+};
+
+export const deleteNote = (noteId) => {
+  return window.electronAPI?.deleteNote?.(noteId);
+};
+
+export const processQuickNote = (payload) => {
+  return window.electronAPI?.processQuickNote?.(payload);
+};
+
 export const listContextHistory = () => {
   return window.electronAPI?.listContextHistory?.();
 };

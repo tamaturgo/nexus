@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Header, Footer, SearchBar, MainContainer } from "./ui/components";
 import ContextOverlay from "./ui/components/layout/ContextOverlay";
 import NeuralCenter from "./ui/components/layout/NeuralCenter";
-import ContextHistory from "./ui/components/layout/ContextHistory";
+import NotesHub from "./ui/components/layout/NotesHub";
 import ErrorToast from "./ui/components/common/ErrorToast";
 import { useAssistant } from "./ui/hooks/useAssistant";
 import {
@@ -11,7 +11,6 @@ import {
   getContextData,
   onContextData,
   resizeWindow,
-  closeCurrentWindow,
   minimizeCurrentWindow
 } from "./infra/ipc/electronBridge.js";
 
@@ -24,15 +23,9 @@ function App() {
         || "search")
     : "single";
 
-  const handleCloseWindow = () => {
-    if (isElectron) {
-      closeCurrentWindow();
-    }
-  };
-
   const handleMinimizeWindow = () => {
     if (isElectron) {
-      closeCurrentWindow();
+      minimizeCurrentWindow();
     }
   };
 
@@ -75,10 +68,8 @@ function App() {
     copyToClipboard,
     clearInput,
     showSettings,
-    showHistory,
+    showNotes,
     micStatus,
-    screenStatus,
-    toggleScreenVision,
     toggleMicrophone,
     isTranscribing,
     voiceError,
@@ -86,26 +77,25 @@ function App() {
     chunksProcessed,
     viewMode,
     mockData,
-    liveVoiceContext,
     settings,
-    historyRefreshToken,
     updateSettings,
     resetSettingsState,
     clearMemory,
-    openHistoryItem,
-    setSearchContentHeight,
-    searchContentHeight
+    inputMode,
+    quickNoteFeedback,
+    selectInputMode
   } = useAssistant({ windowType, isElectron });
 
   const [isFocused, setIsFocused] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const searchContentRef = useRef(null);
 
   useEffect(() => {
     if (voiceError) {
       setErrorMessage(voiceError);
-      setTimeout(() => setErrorMessage(null), 5000);
+      const timer = setTimeout(() => setErrorMessage(null), 5000);
+      return () => clearTimeout(timer);
     }
+    return undefined;
   }, [voiceError]);
 
   useEffect(() => {
@@ -125,64 +115,52 @@ function App() {
     if (!isElectron) return;
     const WIDTH = 600;
     if (windowType === "search") {
-      const height = viewMode === "history" ? 700 : 220;
-      resizeWindow(WIDTH, height);
+      resizeWindow(WIDTH, 220);
     }
     if (windowType === "context") {
       resizeWindow(WIDTH, 720);
     }
-    if (windowType === "settings") {
-      resizeWindow(WIDTH, 820);
-    }
-    if (windowType === "history") {
-      resizeWindow(WIDTH, 720);
-    }
-  }, [isElectron, windowType, viewMode, searchContentHeight]);
+  }, [isElectron, windowType]);
 
   if (windowType === "context") {
     const finalAnswer = typeof contextData.answer === "string"
       ? contextData.answer
       : (contextData.answer?.answer || JSON.stringify(contextData.answer || ""));
 
-    const isLive = contextData.voiceContext?.isLive || false;
-
     return (
       <MainContainer isFocused={isFocused}>
-          <ContextOverlay
-            query={contextData.query}
-            answer={finalAnswer}
-            sections={contextData.sections || []}
-            citations={contextData.citations || []}
-            voiceContext={contextData.voiceContext}
-            isLiveVoice={isLive}
-            onMinimize={handleMinimizeWindow}
-          />
+        <ContextOverlay
+          query={contextData.query}
+          answer={finalAnswer}
+          sections={contextData.sections || []}
+          citations={contextData.citations || []}
+          voiceContext={contextData.voiceContext}
+          isLiveVoice={false}
+          onMinimize={handleMinimizeWindow}
+        />
       </MainContainer>
     );
   }
 
   if (windowType === "settings") {
     return (
-      <MainContainer isFocused={isFocused}>
+      <MainContainer isFocused={isFocused} variant="window">
         <NeuralCenter
           settings={settings}
           onUpdateSettings={updateSettings}
           onResetSettings={resetSettingsState}
           onClearMemory={clearMemory}
           onMinimize={handleMinimizeWindow}
+          fullScreen
         />
       </MainContainer>
     );
   }
 
-  if (windowType === "history") {
+  if (windowType === "notes") {
     return (
-      <MainContainer isFocused={isFocused}>
-        <ContextHistory
-          refreshToken={historyRefreshToken}
-          onOpenContext={openHistoryItem}
-          onMinimize={handleMinimizeWindow}
-        />
+      <MainContainer isFocused={isFocused} variant="window">
+        <NotesHub onMinimize={handleMinimizeWindow} />
       </MainContainer>
     );
   }
@@ -194,64 +172,60 @@ function App() {
         onDismiss={() => setErrorMessage(null)}
       />
 
-      <div ref={searchContentRef} className="relative">
-        {viewMode === "collapsed" && (
-          <Header
-            isProcessing={isProcessing}
-            interactionCount={interactionCount}
-          />
-        )}
-
-        <SearchBar
-          inputValue={inputValue}
-          onInputChange={handleInputChange}
-          onSubmit={handleSubmit}
-          onKeyDown={handleKeyDown}
+      {viewMode === "collapsed" && (
+        <Header
           isProcessing={isProcessing}
-          inputRef={inputRef}
+          interactionCount={interactionCount}
+        />
+      )}
+
+      <SearchBar
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
+        isProcessing={isProcessing}
+        inputRef={inputRef}
         onCopyToClipboard={copyToClipboard}
         onClearInput={clearInput}
         onShowSettings={showSettings}
-        onShowHistory={showHistory}
-          micStatus={micStatus}
-          screenStatus={screenStatus}
-          onToggleScreenVision={toggleScreenVision}
-          onToggleMicrophone={toggleMicrophone}
-          isTranscribing={isTranscribing}
-          permissionDenied={permissionDenied}
-          chunksProcessed={chunksProcessed}
-          onHeightChange={setSearchContentHeight}
+        onShowNotes={showNotes}
+        micStatus={micStatus}
+        onToggleMicrophone={toggleMicrophone}
+        isTranscribing={isTranscribing}
+        permissionDenied={permissionDenied}
+        chunksProcessed={chunksProcessed}
+        inputMode={inputMode}
+        onSelectInputMode={selectInputMode}
+        quickNoteFeedback={quickNoteFeedback}
+      />
+
+      {windowType === "single" && viewMode === "context" && (
+        <ContextOverlay
+          query={mockData?.query || "Query"}
+          answer={mockData?.answer || "No response"}
+          sections={mockData?.sections || []}
+          citations={mockData?.citations || []}
+          voiceContext={mockData?.voiceContext || null}
+          isLiveVoice={false}
         />
+      )}
 
-        {windowType === "single" && viewMode === "context" && (
-          <ContextOverlay
-            query={liveVoiceContext?.isLive ? "Contexto de Voz Ao Vivo" : (mockData?.query || "Query")}
-            answer={liveVoiceContext?.isLive ? (liveVoiceContext.text || "") : (mockData?.answer || "No response")}
-            sections={liveVoiceContext?.isLive ? [] : (mockData?.sections || [])}
-            citations={liveVoiceContext?.isLive ? [] : (mockData?.citations || [])}
-            voiceContext={liveVoiceContext}
-            isLiveVoice={liveVoiceContext?.isLive || false}
-          />
-        )}
+      {windowType === "single" && viewMode === "settings" && (
+        <NeuralCenter
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          onResetSettings={resetSettingsState}
+          onClearMemory={clearMemory}
+          fullScreen
+        />
+      )}
 
-        {windowType === "single" && viewMode === "settings" && (
-          <NeuralCenter
-            settings={settings}
-            onUpdateSettings={updateSettings}
-            onResetSettings={resetSettingsState}
-            onClearMemory={clearMemory}
-          />
-        )}
+      {windowType === "single" && viewMode === "notes" && (
+        <NotesHub />
+      )}
 
-        {viewMode === "history" && windowType === "single" && (
-          <ContextHistory
-            refreshToken={historyRefreshToken}
-            onOpenContext={openHistoryItem}
-          />
-        )}
-
-        {viewMode === "collapsed" && <Footer />}
-      </div>
+      {viewMode === "collapsed" && <Footer />}
     </MainContainer>
   );
 }

@@ -7,6 +7,7 @@ import { registerDesktopCaptureHandlers } from "./handlers/desktopCaptureHandler
 import { registerSettingsHandlers } from "./handlers/settingsHandlers.js";
 import { registerMemoryHandlers } from "./handlers/memoryHandlers.js";
 import { registerContextHistoryHandlers } from "./handlers/contextHistoryHandlers.js";
+import { registerNoteHandlers } from "./handlers/noteHandlers.js";
 
 export const registerHandlers = ({
   windowService,
@@ -16,7 +17,9 @@ export const registerHandlers = ({
   systemCaptureController,
   settingsStore,
   memoryService,
-  contextHistoryStore
+  contextHistoryStore,
+  noteStore,
+  noteService
 }) => {
   registerWindowHandlers(windowService);
   registerContextHandlers(windowService);
@@ -27,4 +30,5 @@ export const registerHandlers = ({
   registerSettingsHandlers(settingsStore);
   registerMemoryHandlers(memoryService);
   registerContextHistoryHandlers(contextHistoryStore);
+  registerNoteHandlers({ noteStore, noteService });
 };

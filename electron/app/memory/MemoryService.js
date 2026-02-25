@@ -3,12 +3,14 @@ import fs from "fs";
 import path from "path";
 
 export class MemoryService {
-  constructor(vectorStore, settingsStore, conversationMemoryStore) {
+  constructor(vectorStore, settingsStore, conversationMemoryStore, noteStore = null) {
     this.vectorStore = vectorStore;
     this.settingsStore = settingsStore;
     this.conversationMemoryStore = conversationMemoryStore;
+    this.noteStore = noteStore;
     this.userDataPath = app.getPath("userData");
     this.historyPath = path.join(this.userDataPath, "context-history.json");
+    this.notesPath = this.noteStore?.filePath || path.join(this.userDataPath, "notes.json");
   }
 
   async clearAll() {
@@ -18,7 +20,8 @@ export class MemoryService {
       vectorStore: false,
       contextHistory: false,
       conversationMemory: false,
-      settings: false
+      settings: false,
+      notes: false
     };
     const errors = [];
 
@@ -54,6 +57,16 @@ export class MemoryService {
     } catch (error) {
       console.error("MemoryService: failed to delete conversation memory:", error);
       errors.push({ step: "conversationMemory", message: error?.message || String(error) });
+    }
+
+    try {
+      if (fs.existsSync(this.notesPath)) {
+        fs.unlinkSync(this.notesPath);
+      }
+      details.notes = true;
+    } catch (error) {
+      console.error("MemoryService: failed to delete notes:", error);
+      errors.push({ step: "notes", message: error?.message || String(error) });
     }
 
     try {

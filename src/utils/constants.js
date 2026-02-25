@@ -1,8 +1,8 @@
 // Constantes da aplicação
 export const APP_CONFIG = {
-  name: 'NEXUS',
+  name: 'RECALLY',
   version: '0.0.1',
-  shortcut: 'NX'
+  shortcut: 'RC'
 };
 
 // Cores do tema

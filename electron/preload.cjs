@@ -47,6 +47,14 @@ try {
     MEMORY: {
       CLEAR_ALL: "memory-clear-all"
     },
+    NOTES: {
+      LIST: "notes-list",
+      GET: "notes-get",
+      CREATE: "notes-create",
+      UPDATE: "notes-update",
+      DELETE: "notes-delete",
+      PROCESS_QUICK_NOTE: "notes-process-quick-note"
+    },
     CONTEXT_HISTORY: {
       LIST: "context-history-list",
       GET: "context-history-get",
@@ -137,6 +145,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   clearAllMemory: () => {
     return ipcRenderer.invoke(CHANNELS.MEMORY.CLEAR_ALL);
+  },
+  listNotes: () => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.LIST);
+  },
+  getNote: (noteId) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.GET, { noteId });
+  },
+  createNote: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.CREATE, payload);
+  },
+  updateNote: (noteId, patch) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.UPDATE, { noteId, patch });
+  },
+  deleteNote: (noteId) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.DELETE, { noteId });
+  },
+  processQuickNote: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.PROCESS_QUICK_NOTE, payload);
   },
   listContextHistory: () => {
     return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.LIST);

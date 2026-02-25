@@ -27,7 +27,11 @@ const mergeComments = (previous = [], incoming = [], limit = 14) => {
   return merged.slice(-limit);
 };
 
-export const useMicTranscription = ({ autoSaveTranscription = true, audioSettings } = {}) => {
+export const useMicTranscription = ({
+  autoSaveTranscription = true,
+  audioSettings,
+  enableInsights = false
+} = {}) => {
   const [isListening, setIsListening] = useState(false);
   const [transcription, setTranscription] = useState("");
   const [fullTranscription, setFullTranscription] = useState("");
@@ -40,38 +44,37 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
   const recorderRef = useRef(null);
   const pipelineRef = useRef(null);
   const isListeningRef = useRef(false);
+  const fullTranscriptionRef = useRef("");
+
+  const appendTranscription = useCallback((chunkText) => {
+    if (!chunkText) return;
+    setTranscription(chunkText);
+    setFullTranscription((previous) => {
+      const next = previous ? `${previous}\n${chunkText}` : chunkText;
+      fullTranscriptionRef.current = next;
+      return next;
+    });
+  }, []);
 
   const handleTranscription = useCallback(async (payload) => {
     const cleanedText = sanitizeTranscriptionText(payload?.text || "");
     if (!cleanedText) return;
-    console.log("[MicTranscription] chunk recebido:", {
-      chunkIndex: payload?.chunkIndex,
-      timestamp: payload?.timestamp,
-      text: cleanedText
-    });
 
-    setChunksProcessed(prev => prev + 1);
+    setChunksProcessed((previous) => previous + 1);
+    appendTranscription(cleanedText);
 
-    let insightResult = null;
-    if (isElectron() && processTranscriptionInsight) {
+    if (enableInsights && isElectron() && processTranscriptionInsight) {
       try {
-        insightResult = await processTranscriptionInsight({
+        await processTranscriptionInsight({
           source: "mic",
           text: cleanedText,
           chunkIndex: payload.chunkIndex,
           timestamp: payload.timestamp,
           durationMs: payload.durationMs || payload.duration || 5
         });
-      } catch (error) {
-        console.error("Erro ao processar insight de microfone:", error);
+      } catch (insightError) {
+        console.error("Erro ao processar insight de microfone:", insightError);
       }
-    }
-
-    if (insightResult && (!insightResult?.relevant || !insightResult?.displayText)) {
-      console.log("[MicTranscription] insight filtrado:", {
-        reason: insightResult?.reason,
-        relevanceScore: insightResult?.relevanceScore
-      });
     }
 
     if (isElectron() && autoSaveTranscription) {
@@ -87,7 +90,7 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
         }
       });
     }
-  }, [autoSaveTranscription]);
+  }, [appendTranscription, autoSaveTranscription, enableInsights]);
 
   const startListening = useCallback(async () => {
     if (isListeningRef.current) return;
@@ -99,6 +102,7 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
       setFullTranscription("");
       setLatestInsight(null);
       setChunksProcessed(0);
+      fullTranscriptionRef.current = "";
 
       if (!isElectron()) {
         setError("Transcricao disponivel apenas no app Electron.");
@@ -111,10 +115,12 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
           pipelineRef.current?.handlePcmChunk(chunk);
         }
       });
-
       recorderRef.current = recorder;
 
-      await resetTranscriptionInsightSession?.("mic");
+      if (enableInsights) {
+        await resetTranscriptionInsightSession?.("mic");
+      }
+
       await recorder.start();
       const sampleRate = recorder.getSampleRate();
 
@@ -144,10 +150,12 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
       isListeningRef.current = false;
       setIsListening(false);
     }
-  }, [handleTranscription]);
+  }, [audioSettings, enableInsights, handleTranscription]);
 
   const stopListening = useCallback(async () => {
-    if (!isListeningRef.current) return;
+    if (!isListeningRef.current) {
+      return fullTranscriptionRef.current.trim();
+    }
 
     try {
       isListeningRef.current = false;
@@ -158,22 +166,28 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
       if (recorderRef.current) {
         await recorderRef.current.stop();
       }
-      await resetTranscriptionInsightSession?.("mic");
+
+      await pipelineRef.current?.waitForIdle?.(3000);
+
+      if (enableInsights) {
+        await resetTranscriptionInsightSession?.("mic");
+      }
     } catch (err) {
       console.error("Erro ao parar captura:", err);
     }
-  }, []);
+
+    return fullTranscriptionRef.current.trim();
+  }, [enableInsights]);
 
   const toggleListening = useCallback(() => {
     if (isListeningRef.current) {
-      stopListening();
-    } else {
-      startListening();
+      return stopListening();
     }
+    return startListening();
   }, [startListening, stopListening]);
 
   useEffect(() => {
-    if (!isElectron()) return undefined;
+    if (!enableInsights || !isElectron()) return undefined;
 
     const offInsight = onTranscriptionInsight?.((payload) => {
       if (!payload || payload.source !== "mic") return;
@@ -183,6 +197,7 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
       if (!displayText && !summary && incomingComments.length === 0) return;
 
       const visibleText = displayText || summary;
+      fullTranscriptionRef.current = visibleText;
       setFullTranscription(visibleText);
       setTranscription(visibleText);
       setLatestInsight((previous) => {
@@ -199,24 +214,21 @@ export const useMicTranscription = ({ autoSaveTranscription = true, audioSetting
           timestamp: payload.timestamp || Date.now()
         };
       });
-      console.log("[MicTranscription] insight relevante exibido:", {
-        relevanceScore: payload?.relevanceScore,
-        insightType: payload?.insightType,
-        text: visibleText
-      });
     });
 
     return () => offInsight?.();
-  }, []);
+  }, [enableInsights]);
 
   useEffect(() => {
     return () => {
       isListeningRef.current = false;
       pipelineRef.current?.flush({ reason: "cleanup" });
       recorderRef.current?.stop();
-      resetTranscriptionInsightSession?.("mic");
+      if (enableInsights) {
+        resetTranscriptionInsightSession?.("mic");
+      }
     };
-  }, []);
+  }, [enableInsights]);
 
   return {
     isListening,

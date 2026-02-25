@@ -39,6 +39,14 @@ export const CHANNELS = {
   MEMORY: {
     CLEAR_ALL: "memory-clear-all"
   },
+  NOTES: {
+    LIST: "notes-list",
+    GET: "notes-get",
+    CREATE: "notes-create",
+    UPDATE: "notes-update",
+    DELETE: "notes-delete",
+    PROCESS_QUICK_NOTE: "notes-process-quick-note"
+  },
   CONTEXT_HISTORY: {
     LIST: "context-history-list",
     GET: "context-history-get",

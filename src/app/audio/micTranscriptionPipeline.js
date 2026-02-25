@@ -28,11 +28,21 @@ export const createMicTranscriptionPipeline = ({
   let processing = false;
   const queue = [];
   let chunkIndex = 0;
+  let idleWaiters = [];
+
+  const resolveIdleWaiters = () => {
+    if (processing || queue.length > 0) return;
+    if (!idleWaiters.length) return;
+    const waiters = idleWaiters;
+    idleWaiters = [];
+    waiters.forEach((resolve) => resolve());
+  };
 
   const emitProcessing = () => {
     if (onProcessingChange) {
       onProcessingChange(processing || queue.length > 0);
     }
+    resolveIdleWaiters();
   };
 
   const processQueue = async () => {
@@ -87,6 +97,24 @@ export const createMicTranscriptionPipeline = ({
       if (ready) {
         enqueueChunk(ready);
       }
+    },
+    waitForIdle(timeoutMs = 2500) {
+      if (!processing && queue.length === 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        idleWaiters.push(finish);
+        if (typeof timeoutMs === "number" && timeoutMs > 0) {
+          setTimeout(finish, timeoutMs);
+        }
+      });
     }
   };
 };
