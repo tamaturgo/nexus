@@ -6,6 +6,7 @@ import {
   toggleFavorite,
   deleteHistoryItem
 } from "../../../app/context/contextHistory.js";
+import { startWindowDrag } from "../../../infra/ipc/electronBridge.js";
 
 const ContextHistory = ({ onOpenContext, refreshToken = 0, onMinimize }) => {
   const [items, setItems] = useState([]);
@@ -45,10 +46,14 @@ const ContextHistory = ({ onOpenContext, refreshToken = 0, onMinimize }) => {
     await deleteHistoryItem?.(contextId);
     setItems((prev) => prev.filter((item) => item.contextId !== contextId));
   };
+  const handleMouseDown = (event) => {
+    if (event.button !== 0) return;
+    startWindowDrag();
+  };
 
   return (
     <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300" style={{ WebkitAppRegion: "no-drag" }}>
-      <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" style={{ WebkitAppRegion: "drag" }}>
+      <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" data-tauri-drag-region onMouseDown={handleMouseDown} style={{ WebkitAppRegion: "drag" }}>
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
           <FiClock className="text-purple-400" />
           Historico de Contextos

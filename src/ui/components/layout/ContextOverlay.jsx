@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { FiPlay, FiCpu, FiCheck, FiX, FiLayers, FiMinus, FiList, FiCode, FiFileText, FiMic } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { startWindowDrag } from '../../../infra/ipc/electronBridge.js';
 
 // Componente customizado para renderizar markdown com estilos do tema
 const MarkdownRenderer = ({ content }) => {
@@ -135,6 +136,10 @@ const MarkdownRenderer = ({ content }) => {
 };
 
 const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceContext, isLiveVoice, onMinimize }) => {
+  const handleMouseDown = (event) => {
+    if (event.button !== 0) return;
+    startWindowDrag();
+  };
   
   // Debug logs
   console.log('ContextOverlay render:', { isLiveVoice, hasVoiceContext: !!voiceContext, voiceText: voiceContext?.text });
@@ -173,6 +178,8 @@ const ContextOverlay = ({ query, answer, sections = [], citations = [], voiceCon
       {/* Header */}
       <div
         className="flex items-center justify-between mb-3"
+        data-tauri-drag-region
+        onMouseDown={handleMouseDown}
         style={{ WebkitAppRegion: 'drag' }}
       >
         <div className="text-xs font-mono text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -408,7 +415,3 @@ ContextOverlay.propTypes = {
 };
 
 export default ContextOverlay;
-
-
-
-

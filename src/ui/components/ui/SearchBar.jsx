@@ -87,51 +87,9 @@ const SearchBar = ({
   const isQuickNote = inputMode === QUICK_NOTE;
 
   return (
-    <div className="relative" style={{ WebkitAppRegion: "drag" }}>
-      <div className="px-3 pt-2 pb-3">
-        <div className="mb-2 flex items-center justify-between" style={{ WebkitAppRegion: "no-drag" }}>
-          <div
-            className="inline-flex items-center p-0.5 rounded-lg border border-white/15 bg-black/40"
-            role="radiogroup"
-            aria-label="Modo da barra"
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={isQuickNote}
-              onClick={() => onSelectInputMode(QUICK_NOTE)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                isQuickNote
-                  ? "border border-emerald-400/40 text-emerald-200 bg-emerald-500/15"
-                  : "border border-transparent text-gray-300 hover:text-white hover:bg-white/5"
-              }`}
-              title="Modo Quick Note"
-            >
-              <FiEdit3 className="w-3 h-3" />
-              Quick Note
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              aria-checked={!isQuickNote}
-              onClick={() => onSelectInputMode(SEARCH)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                !isQuickNote
-                  ? "border border-blue-400/40 text-blue-200 bg-blue-500/15"
-                  : "border border-transparent text-gray-300 hover:text-white hover:bg-white/5"
-              }`}
-              title="Modo Search"
-            >
-              <FiSearch className="w-3 h-3" />
-              Search
-            </button>
-          </div>
-          <div className="text-[11px] text-gray-500">
-            {micStatus ? "Gravando..." : ""}
-          </div>
-        </div>
-
+    <div className="relative" data-tauri-drag-region style={{ WebkitAppRegion: 'drag' }}>
+      {/* Área de input */}
+      <div ref={containerRef} className="p-3">
         <form onSubmit={handleSubmit} className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <InputField

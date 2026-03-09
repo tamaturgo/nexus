@@ -1,52 +1,155 @@
-export const isElectron = () => typeof window !== "undefined" && !!window.electronAPI;
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+const DEFAULT_SETTINGS = {
+  audio: {
+    inputDevice: "both",
+    systemCaptureMode: "loopback",
+    silenceThreshold: 0.01,
+    silenceMs: 700
+  },
+  ai: {
+    provider: "gemini",
+    model: "gemini-2.5-flash",
+    temperature: 0.7
+  },
+  memory: {
+    autoSaveTranscription: true,
+    maxItems: 500,
+    retentionDays: 30
+  }
+};
+
+const isTauriRuntime = () => typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
+const isElectronRuntime = () => typeof window !== "undefined" && !!window.electronAPI;
+
+const tauriInvoke = async (command, payload = {}, fallback = undefined) => {
+  if (!isTauriRuntime()) return fallback;
+  try {
+    return await invoke(command, payload);
+  } catch (error) {
+    console.warn(`tauri invoke failed: ${command}`, error);
+    return fallback;
+  }
+};
+
+export const isElectron = () => isElectronRuntime() || isTauriRuntime();
 
 export const getWindowType = () => {
-  if (!isElectron()) return null;
-  return window.electronAPI?.getWindowType?.() || null;
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getWindowType?.() || null;
+  }
+
+  if (isTauriRuntime()) {
+    const label = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label || null;
+    if (!label) return null;
+    if (label.startsWith("context-")) return "context";
+    if (label === "context" || label === "settings" || label === "history" || label === "search") {
+      return label;
+    }
+    return "search";
+  }
+
+  return null;
 };
 
 export const resizeWindow = (width, height) => {
-  return window.electronAPI?.resizeWindow?.(width, height);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.resizeWindow?.(width, height);
+  }
+  return tauriInvoke("resize_window", { width, height });
 };
 
 export const openWindow = (type, payload) => {
-  return window.electronAPI?.openWindow?.(type, payload);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.openWindow?.(type, payload);
+  }
+  return tauriInvoke("open_window", { windowType: type, payload: payload ?? null });
 };
 
 export const updateContextWindow = (payload) => {
-  return window.electronAPI?.updateContextWindow?.(payload);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.updateContextWindow?.(payload);
+  }
+  return tauriInvoke("update_context_window", { payload: payload ?? null });
 };
 
 export const closeCurrentWindow = () => {
-  return window.electronAPI?.closeCurrentWindow?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.closeCurrentWindow?.();
+  }
+  return tauriInvoke("close_current_window");
 };
 
 export const minimizeCurrentWindow = () => {
-  return window.electronAPI?.minimizeCurrentWindow?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.minimizeCurrentWindow?.();
+  }
+  return tauriInvoke("minimize_current_window");
 };
 
 export const getContextData = () => {
-  return window.electronAPI?.getContextData?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getContextData?.();
+  }
+  return tauriInvoke("get_context_data", {}, null);
+};
+
+export const startWindowDrag = async () => {
+  if (isElectronRuntime()) {
+    return window.electronAPI?.startDrag?.();
+  }
+  if (!isTauriRuntime()) return;
+  try {
+    await getCurrentWindow().startDragging();
+  } catch (error) {
+    console.warn("startWindowDrag failed", error);
+  }
 };
 
 export const onContextData = (callback) => {
-  return window.electronAPI?.onContextData?.(callback);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.onContextData?.(callback);
+  }
+
+  if (!isTauriRuntime()) return undefined;
+
+  const unlistenPromise = listen("context-data", (event) => {
+    callback(event.payload);
+  });
+
+  return () => {
+    unlistenPromise.then((unlisten) => unlisten()).catch(() => {});
+  };
 };
 
 export const askAI = (prompt) => {
-  return window.electronAPI?.askAI?.(prompt);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.askAI?.(prompt);
+  }
+  return Promise.reject(new Error("askAI ainda nao migrado para Tauri."));
 };
 
 export const saveMemory = (text, metadata) => {
-  return window.electronAPI?.saveMemory?.(text, metadata);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.saveMemory?.(text, metadata);
+  }
+  return Promise.resolve(false);
 };
 
 export const saveTranscription = ({ text, metadata }) => {
-  return window.electronAPI?.saveTranscription?.({ text, metadata });
+  if (isElectronRuntime()) {
+    return window.electronAPI?.saveTranscription?.({ text, metadata });
+  }
+  return Promise.resolve(false);
 };
 
 export const transcribeAudio = ({ audioBuffer, options }) => {
-  return window.electronAPI?.transcribeAudio?.({ audioBuffer, options });
+  if (isElectronRuntime()) {
+    return window.electronAPI?.transcribeAudio?.({ audioBuffer, options });
+  }
+  return Promise.reject(new Error("transcribeAudio ainda nao migrado para Tauri."));
 };
 
 export const processTranscriptionInsight = (payload) => {
@@ -62,35 +165,59 @@ export const onTranscriptionInsight = (callback) => {
 };
 
 export const startSystemCapture = (options) => {
-  return window.electronAPI?.startSystemCapture?.(options);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.startSystemCapture?.(options);
+  }
+  return Promise.resolve({ started: false, reason: "not_migrated" });
 };
 
 export const stopSystemCapture = () => {
-  return window.electronAPI?.stopSystemCapture?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.stopSystemCapture?.();
+  }
+  return Promise.resolve({ stopped: false, reason: "not_migrated" });
 };
 
 export const getSystemCaptureDevices = () => {
-  return window.electronAPI?.getSystemCaptureDevices?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getSystemCaptureDevices?.();
+  }
+  return Promise.resolve([]);
 };
 
 export const getDesktopSources = (options) => {
-  return window.electronAPI?.getDesktopSources?.(options);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getDesktopSources?.(options);
+  }
+  return Promise.resolve([]);
 };
 
 export const getSettings = () => {
-  return window.electronAPI?.getSettings?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getSettings?.();
+  }
+  return Promise.resolve({ ...DEFAULT_SETTINGS });
 };
 
 export const saveSettings = (partial) => {
-  return window.electronAPI?.saveSettings?.(partial);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.saveSettings?.(partial);
+  }
+  return Promise.resolve({ ...DEFAULT_SETTINGS, ...(partial || {}) });
 };
 
 export const resetSettings = () => {
-  return window.electronAPI?.resetSettings?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.resetSettings?.();
+  }
+  return Promise.resolve({ ...DEFAULT_SETTINGS });
 };
 
 export const clearAllMemory = () => {
-  return window.electronAPI?.clearAllMemory?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.clearAllMemory?.();
+  }
+  return Promise.resolve({ cleared: false, reason: "not_migrated" });
 };
 
 export const listNotes = () => {
@@ -118,37 +245,64 @@ export const processQuickNote = (payload) => {
 };
 
 export const listContextHistory = () => {
-  return window.electronAPI?.listContextHistory?.();
+  if (isElectronRuntime()) {
+    return window.electronAPI?.listContextHistory?.();
+  }
+  return Promise.resolve([]);
 };
 
 export const getContextHistoryItem = (contextId) => {
-  return window.electronAPI?.getContextHistoryItem?.(contextId);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.getContextHistoryItem?.(contextId);
+  }
+  return Promise.resolve(null);
 };
 
 export const saveContextHistory = (payload) => {
-  return window.electronAPI?.saveContextHistory?.(payload);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.saveContextHistory?.(payload);
+  }
+  return Promise.resolve(null);
 };
 
 export const toggleContextFavorite = (contextId) => {
-  return window.electronAPI?.toggleContextFavorite?.(contextId);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.toggleContextFavorite?.(contextId);
+  }
+  return Promise.resolve(null);
 };
 
 export const deleteContextHistory = (contextId) => {
-  return window.electronAPI?.deleteContextHistory?.(contextId);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.deleteContextHistory?.(contextId);
+  }
+  return Promise.resolve(false);
 };
 
 export const onSystemTranscription = (callback) => {
-  return window.electronAPI?.onSystemTranscription?.(callback);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.onSystemTranscription?.(callback);
+  }
+  return undefined;
 };
 
 export const onSystemTranscriptionStatus = (callback) => {
-  return window.electronAPI?.onSystemTranscriptionStatus?.(callback);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.onSystemTranscriptionStatus?.(callback);
+  }
+  return undefined;
 };
 
 export const onSystemCaptureStatus = (callback) => {
-  return window.electronAPI?.onSystemCaptureStatus?.(callback);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.onSystemCaptureStatus?.(callback);
+  }
+  return undefined;
 };
 
 export const onSystemCaptureError = (callback) => {
-  return window.electronAPI?.onSystemCaptureError?.(callback);
+  if (isElectronRuntime()) {
+    return window.electronAPI?.onSystemCaptureError?.(callback);
+  }
+  return undefined;
 };
