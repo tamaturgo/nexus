@@ -9,6 +9,7 @@ import {
   FiTrash2,
   FiMinus
 } from "react-icons/fi";
+import { startWindowDrag } from "../../../infra/ipc/electronBridge.js";
 
 const modelOptions = [
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -29,6 +30,10 @@ const NeuralCenter = ({
   onMinimize
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
+  const handleMouseDown = (event) => {
+    if (event.button !== 0) return;
+    startWindowDrag();
+  };
 
   const handleClearMemory = async () => {
     if (!confirmClear) {
@@ -46,7 +51,7 @@ const NeuralCenter = ({
 
   return (
     <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[620px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent" style={{ WebkitAppRegion: "no-drag" }}>
-      <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" style={{ WebkitAppRegion: "drag" }}>
+      <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2" data-tauri-drag-region onMouseDown={handleMouseDown} style={{ WebkitAppRegion: "drag" }}>
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
           <FiSliders className="text-purple-400" />
           Settings

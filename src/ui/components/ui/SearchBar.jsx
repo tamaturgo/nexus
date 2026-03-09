@@ -78,7 +78,7 @@ const SearchBar = ({
   const showQuickIcons = !isTyping && !inputValue;
 
   return (
-    <div className="relative" style={{ WebkitAppRegion: 'drag' }}>
+    <div className="relative" data-tauri-drag-region style={{ WebkitAppRegion: 'drag' }}>
       {/* Área de input */}
       <div ref={containerRef} className="p-3">
         <form onSubmit={handleSubmit} className="flex items-start gap-3">

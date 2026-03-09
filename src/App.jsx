@@ -32,7 +32,7 @@ function App() {
 
   const handleMinimizeWindow = () => {
     if (isElectron) {
-      closeCurrentWindow();
+      minimizeCurrentWindow();
     }
   };
 
