@@ -18,7 +18,10 @@ module.exports = {
       SAVE_TRANSCRIPTION: "save-transcription"
     },
     TRANSCRIPTION: {
-      TRANSCRIBE_AUDIO: "transcribe-audio"
+      TRANSCRIBE_AUDIO: "transcribe-audio",
+      PROCESS_INSIGHT: "transcription-process-insight",
+      RESET_INSIGHT_SESSION: "transcription-reset-insight-session",
+      INSIGHT_EVENT: "transcription-insight"
     },
     SYSTEM_CAPTURE: {
       START: "system-capture-start",
@@ -36,6 +39,14 @@ module.exports = {
     },
     MEMORY: {
       CLEAR_ALL: "memory-clear-all"
+    },
+    NOTES: {
+      LIST: "notes-list",
+      GET: "notes-get",
+      CREATE: "notes-create",
+      UPDATE: "notes-update",
+      DELETE: "notes-delete",
+      PROCESS_QUICK_NOTE: "notes-process-quick-note"
     },
     CONTEXT_HISTORY: {
       LIST: "context-history-list",

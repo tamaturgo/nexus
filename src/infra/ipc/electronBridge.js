@@ -152,6 +152,18 @@ export const transcribeAudio = ({ audioBuffer, options }) => {
   return Promise.reject(new Error("transcribeAudio ainda nao migrado para Tauri."));
 };
 
+export const processTranscriptionInsight = (payload) => {
+  return window.electronAPI?.processTranscriptionInsight?.(payload);
+};
+
+export const resetTranscriptionInsightSession = (source) => {
+  return window.electronAPI?.resetTranscriptionInsightSession?.({ source });
+};
+
+export const onTranscriptionInsight = (callback) => {
+  return window.electronAPI?.onTranscriptionInsight?.(callback);
+};
+
 export const startSystemCapture = (options) => {
   if (isElectronRuntime()) {
     return window.electronAPI?.startSystemCapture?.(options);
@@ -206,6 +218,30 @@ export const clearAllMemory = () => {
     return window.electronAPI?.clearAllMemory?.();
   }
   return Promise.resolve({ cleared: false, reason: "not_migrated" });
+};
+
+export const listNotes = () => {
+  return window.electronAPI?.listNotes?.();
+};
+
+export const getNote = (noteId) => {
+  return window.electronAPI?.getNote?.(noteId);
+};
+
+export const createNote = (payload) => {
+  return window.electronAPI?.createNote?.(payload);
+};
+
+export const updateNote = (noteId, patch) => {
+  return window.electronAPI?.updateNote?.(noteId, patch);
+};
+
+export const deleteNote = (noteId) => {
+  return window.electronAPI?.deleteNote?.(noteId);
+};
+
+export const processQuickNote = (payload) => {
+  return window.electronAPI?.processQuickNote?.(payload);
 };
 
 export const listContextHistory = () => {

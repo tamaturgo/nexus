@@ -1,7 +1,7 @@
-# Nexus IA - Technical Specification & MVP Roadmap
+# Recally - Technical Specification & MVP Roadmap
 
 ## 1. Project Overview
-Nexus IA is a desktop application designed to integrate artificial intelligence directly into the operating system workflow. It functions as a productivity assistant that processes real-time context via audio capture (microphone and system) and screen capture.
+Recally is a desktop application designed to integrate artificial intelligence directly into the operating system workflow. It functions as a productivity assistant that processes real-time context via audio capture (microphone and system) and screen capture.
 
 **Core Philosophy:** Low latency, privacy-focused, hybrid processing (Local + Cloud).
 

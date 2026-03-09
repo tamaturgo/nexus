@@ -1,15 +1,27 @@
-import PropTypes from 'prop-types';
-import { useState, useEffect, useRef } from 'react';
-import { FiClipboard, FiX, FiSend, FiSettings, FiEye, FiEyeOff, FiMic, FiClock } from 'react-icons/fi';
-import ActionButton from '../common/ActionButton';
-import InputField from '../common/InputField';
+import PropTypes from "prop-types";
+import { useState, useEffect } from "react";
+import {
+  FiClipboard,
+  FiX,
+  FiSend,
+  FiSettings,
+  FiMic,
+  FiBookOpen,
+  FiSearch,
+  FiEdit3
+} from "react-icons/fi";
+import ActionButton from "../common/ActionButton";
+import InputField from "../common/InputField";
+
+const QUICK_NOTE = "quick-note";
+const SEARCH = "search";
 
 const Waveform = ({ isActive }) => (
-  <div className={`flex items-center gap-[2px] h-4 ${isActive ? 'opacity-100' : 'opacity-40'}`}>
-     <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 ${isActive ? 'h-3 animate-pulse' : 'h-1'}`} />
-     <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-75 ${isActive ? 'h-4 animate-pulse' : 'h-1.5'}`} />
-     <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-150 ${isActive ? 'h-2 animate-pulse' : 'h-1'}`} />
-     <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-100 ${isActive ? 'h-3 animate-pulse' : 'h-1'}`} />
+  <div className={`flex items-center gap-[2px] h-4 ${isActive ? "opacity-100" : "opacity-40"}`}>
+    <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 ${isActive ? "h-3 animate-pulse" : "h-1"}`} />
+    <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-75 ${isActive ? "h-4 animate-pulse" : "h-1.5"}`} />
+    <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-150 ${isActive ? "h-2 animate-pulse" : "h-1"}`} />
+    <div className={`w-[2px] bg-purple-500 rounded-full transition-all duration-300 delay-100 ${isActive ? "h-3 animate-pulse" : "h-1"}`} />
   </div>
 );
 
@@ -27,55 +39,52 @@ const SearchBar = ({
   onCopyToClipboard,
   onClearInput,
   onShowSettings,
-  onShowHistory,
+  onShowNotes,
   micStatus,
-  screenStatus,
-  onToggleScreenVision,
   onToggleMicrophone,
   isTranscribing,
   permissionDenied,
   chunksProcessed,
-  onHeightChange
+  inputMode,
+  onSelectInputMode,
+  quickNoteFeedback
 }) => {
-  const [placeholder, setPlaceholder] = useState("Ask me anything...");
-  const [isTyping, setIsTyping] = useState(false);
-  const containerRef = useRef(null);
-  
+  const [placeholder, setPlaceholder] = useState("Capture uma nota rapida...");
+
   useEffect(() => {
-    const placeholders = [
-      "Ask me anything...",
-      "Summarize this meeting...",
-      "What was decided?",
-      "Analyze this screen..."
+    const searchPlaceholders = [
+      "Pergunte usando suas notas e memoria...",
+      "O que foi decidido sobre o projeto?",
+      "Resuma os ultimos pontos importantes..."
     ];
+    const notePlaceholders = [
+      "Capture uma nota rapida...",
+      "Ex.: Ligar para cliente amanha as 10h",
+      "Ex.: Ideia para feature de onboarding"
+    ];
+
+    const options = inputMode === SEARCH ? searchPlaceholders : notePlaceholders;
+    setPlaceholder(options[0]);
+
     let index = 0;
     const interval = setInterval(() => {
       if (!micStatus && !isTranscribing) {
-        index = (index + 1) % placeholders.length;
-        setPlaceholder(placeholders[index]);
+        index = (index + 1) % options.length;
+        setPlaceholder(options[index]);
       }
-    }, 4000);
+    }, 3800);
+
     return () => clearInterval(interval);
-  }, [micStatus, isTranscribing]);
+  }, [inputMode, micStatus, isTranscribing]);
 
-  useEffect(() => {
-    if (!containerRef.current || !onHeightChange) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      onHeightChange(Math.ceil(entry.contentRect.height));
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [onHeightChange]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isProcessing) return;
-    onSubmit(e);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!inputValue.trim() || (isProcessing && !isQuickNote)) return;
+    onSubmit(event);
   };
 
-  const showQuickIcons = !isTyping && !inputValue;
+  const hasInput = inputValue.length > 0;
+  const isQuickNote = inputMode === QUICK_NOTE;
 
   return (
     <div className="relative" data-tauri-drag-region style={{ WebkitAppRegion: 'drag' }}>
@@ -87,8 +96,6 @@ const SearchBar = ({
               value={inputValue}
               onChange={onInputChange}
               onKeyDown={onKeyDown}
-              onFocus={() => setIsTyping(true)}
-              onBlur={() => setIsTyping(false)}
               inputRef={inputRef}
               placeholder={placeholder}
               icon={() => <Waveform isActive={micStatus} />}
@@ -96,89 +103,75 @@ const SearchBar = ({
             />
           </div>
 
-          {/* Controles à direita */}
-          <div 
-            className="flex items-center gap-1 pt-1 ml-auto justify-end min-w-[200px]"
-            style={{ WebkitAppRegion: 'no-drag' }}
+          <div
+            className="flex items-center gap-1 pt-1 ml-auto justify-end min-w-[220px]"
+            style={{ WebkitAppRegion: "no-drag" }}
           >
-            {showQuickIcons && (
-              <ActionButton
-                onClick={onToggleScreenVision}
-                title={screenStatus ? "Vision On" : "Vision Off"}
-                className={screenStatus ? "text-green-400" : "text-gray-400"}
-              >
-                {screenStatus ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
-              </ActionButton>
-            )}
-            
-            {/* Microphone Toggle */}
             <ActionButton
               onClick={onToggleMicrophone}
               title={
-                permissionDenied 
-                  ? "Clique para permitir microfone" 
-                  : micStatus 
-                    ? "Parar captura de voz" 
-                    : "Iniciar captura de voz"
+                permissionDenied
+                  ? "Clique para permitir microfone"
+                  : micStatus
+                    ? "Parar gravacao"
+                    : "Iniciar gravacao"
               }
               className={
-                permissionDenied 
-                  ? "text-yellow-400" 
-                  : micStatus 
-                    ? "text-red-400 animate-pulse" 
+                permissionDenied
+                  ? "text-yellow-400"
+                  : micStatus
+                    ? "text-red-400 animate-pulse"
                     : "text-gray-400"
               }
             >
               <FiMic className="w-4 h-4" />
             </ActionButton>
-            
-            {showQuickIcons && <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />}
 
-            {inputValue && (
-              <ActionButton
-                onClick={onCopyToClipboard}
-                title="Copiar"
-              >
-                <FiClipboard className="w-4 h-4" />
-              </ActionButton>
-            )}
+            <div className="w-px h-4 bg-white bg-opacity-10 mx-1" />
 
-            {showQuickIcons && (
+            {hasInput ? (
+              <>
+                <ActionButton
+                  onClick={onCopyToClipboard}
+                  title="Copiar"
+                >
+                  <FiClipboard className="w-4 h-4" />
+                </ActionButton>
+
+                <ActionButton
+                  onClick={onClearInput}
+                  title="Limpar"
+                >
+                  <FiX className="w-4 h-4" />
+                </ActionButton>
+              </>
+            ) : (
               <>
                 <ActionButton
                   onClick={onShowSettings}
                   disabled={isProcessing}
-                  title="Configurações"
+                  title="Configuracoes"
                 >
                   <FiSettings className="w-4 h-4" />
                 </ActionButton>
 
                 <ActionButton
-                  onClick={onShowHistory}
+                  onClick={onShowNotes}
                   disabled={isProcessing}
-                  title="Histórico"
+                  title="Notas"
                 >
-                  <FiClock className="w-4 h-4" />
+                  <FiBookOpen className="w-4 h-4" />
                 </ActionButton>
               </>
             )}
 
-            {inputValue && (
-              <ActionButton
-                onClick={onClearInput}
-                title="Limpar"
-              >
-                <FiX className="w-4 h-4" />
-              </ActionButton>
-            )}
-
-            {showQuickIcons && <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />}
+            <div className="w-px h-6 bg-white bg-opacity-10 mx-2" />
 
             <ActionButton
               onClick={handleSubmit}
-              disabled={!inputValue.trim() || isProcessing || isTranscribing}
+              disabled={!inputValue.trim() || (isProcessing && !isQuickNote) || isTranscribing}
               variant="primary"
-              title="Executar"
+              title={isQuickNote ? "Salvar quick note" : "Pesquisar"}
             >
               {isProcessing ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -188,6 +181,21 @@ const SearchBar = ({
             </ActionButton>
           </div>
         </form>
+
+        {quickNoteFeedback?.message && (
+          <div
+            className={`mt-2 text-xs px-3 py-2 rounded-md border ${
+              quickNoteFeedback.type === "success"
+                ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10"
+                : quickNoteFeedback.type === "error"
+                  ? "text-red-200 border-red-400/30 bg-red-500/10"
+                  : "text-gray-300 border-white/10 bg-black/20"
+            }`}
+            style={{ WebkitAppRegion: "no-drag" }}
+          >
+            {quickNoteFeedback.message}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -203,15 +211,18 @@ SearchBar.propTypes = {
   onCopyToClipboard: PropTypes.func.isRequired,
   onClearInput: PropTypes.func.isRequired,
   onShowSettings: PropTypes.func.isRequired,
-  onShowHistory: PropTypes.func.isRequired,
+  onShowNotes: PropTypes.func.isRequired,
   micStatus: PropTypes.bool,
-  screenStatus: PropTypes.bool,
-  onToggleScreenVision: PropTypes.func,
   onToggleMicrophone: PropTypes.func.isRequired,
   isTranscribing: PropTypes.bool,
   permissionDenied: PropTypes.bool,
   chunksProcessed: PropTypes.number,
-  onHeightChange: PropTypes.func
+  inputMode: PropTypes.oneOf([QUICK_NOTE, SEARCH]).isRequired,
+  onSelectInputMode: PropTypes.func.isRequired,
+  quickNoteFeedback: PropTypes.shape({
+    type: PropTypes.string,
+    message: PropTypes.string
+  })
 };
 
 export default SearchBar;

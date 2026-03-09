@@ -25,7 +25,10 @@ try {
       SAVE_TRANSCRIPTION: "save-transcription"
     },
     TRANSCRIPTION: {
-      TRANSCRIBE_AUDIO: "transcribe-audio"
+      TRANSCRIBE_AUDIO: "transcribe-audio",
+      PROCESS_INSIGHT: "transcription-process-insight",
+      RESET_INSIGHT_SESSION: "transcription-reset-insight-session",
+      INSIGHT_EVENT: "transcription-insight"
     },
     SYSTEM_CAPTURE: {
       START: "system-capture-start",
@@ -43,6 +46,14 @@ try {
     },
     MEMORY: {
       CLEAR_ALL: "memory-clear-all"
+    },
+    NOTES: {
+      LIST: "notes-list",
+      GET: "notes-get",
+      CREATE: "notes-create",
+      UPDATE: "notes-update",
+      DELETE: "notes-delete",
+      PROCESS_QUICK_NOTE: "notes-process-quick-note"
     },
     CONTEXT_HISTORY: {
       LIST: "context-history-list",
@@ -100,6 +111,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   transcribeAudio: ({ audioBuffer, options }) => {
     return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.TRANSCRIBE_AUDIO, { audioBuffer, options });
   },
+  processTranscriptionInsight: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.PROCESS_INSIGHT, payload);
+  },
+  resetTranscriptionInsightSession: ({ source }) => {
+    return ipcRenderer.invoke(CHANNELS.TRANSCRIPTION.RESET_INSIGHT_SESSION, { source });
+  },
+  onTranscriptionInsight: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on(CHANNELS.TRANSCRIPTION.INSIGHT_EVENT, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.TRANSCRIPTION.INSIGHT_EVENT, handler);
+  },
   startSystemCapture: (options) => {
     return ipcRenderer.invoke(CHANNELS.SYSTEM_CAPTURE.START, options);
   },
@@ -123,6 +145,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   clearAllMemory: () => {
     return ipcRenderer.invoke(CHANNELS.MEMORY.CLEAR_ALL);
+  },
+  listNotes: () => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.LIST);
+  },
+  getNote: (noteId) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.GET, { noteId });
+  },
+  createNote: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.CREATE, payload);
+  },
+  updateNote: (noteId, patch) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.UPDATE, { noteId, patch });
+  },
+  deleteNote: (noteId) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.DELETE, { noteId });
+  },
+  processQuickNote: (payload) => {
+    return ipcRenderer.invoke(CHANNELS.NOTES.PROCESS_QUICK_NOTE, payload);
   },
   listContextHistory: () => {
     return ipcRenderer.invoke(CHANNELS.CONTEXT_HISTORY.LIST);

@@ -7,19 +7,32 @@ import {
   FiDatabase,
   FiRefreshCcw,
   FiTrash2,
-  FiMinus
+  FiMinus,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiLoader
 } from "react-icons/fi";
 import { startWindowDrag } from "../../../infra/ipc/electronBridge.js";
 
 const modelOptions = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" }
+  {
+    provider: "openrouter",
+    items: [
+      { value: "arcee-ai/trinity-large-preview:free", label: "Arcee AI Trinity Large Preview" }
+    ]
+  },
+  {
+    provider: "gemini",
+    items: [
+      { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" }
+    ]
+  }
 ];
 
-const inputOptions = [
-  { value: "both", label: "Microfone + Sistema" },
-  { value: "mic", label: "Somente microfone" },
-  { value: "system", label: "Somente sistema" }
+const providerOptions = [
+  { value: "openrouter", label: "OpenRouter" },
+  { value: "gemini", label: "Gemini" }
 ];
 
 const NeuralCenter = ({
@@ -27,7 +40,8 @@ const NeuralCenter = ({
   onUpdateSettings,
   onResetSettings,
   onClearMemory,
-  onMinimize
+  onMinimize,
+  fullScreen = false
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const handleMouseDown = (event) => {
@@ -42,12 +56,48 @@ const NeuralCenter = ({
       return;
     }
     setConfirmClear(false);
-    await onClearMemory?.();
+    setClearFeedback({ status: "loading", message: "Limpando memoria..." });
+
+    try {
+      const result = await onClearMemory?.();
+      if (result?.ok) {
+        setClearFeedback({
+          status: "success",
+          message: result.message || "Memoria limpa com sucesso."
+        });
+      } else {
+        setClearFeedback({
+          status: "error",
+          message: result?.message || "Nao foi possivel limpar a memoria."
+        });
+      }
+    } catch (error) {
+      setClearFeedback({
+        status: "error",
+        message: error?.message || "Erro ao limpar memoria."
+      });
+    }
   };
 
   const updateAudio = (patch) => onUpdateSettings?.({ audio: patch });
   const updateAi = (patch) => onUpdateSettings?.({ ai: patch });
   const updateMemory = (patch) => onUpdateSettings?.({ memory: patch });
+
+  const aiProvider = settings.ai?.provider || "openrouter";
+  const availableModels =
+    modelOptions.find((option) => option.provider === aiProvider)?.items || modelOptions[0].items;
+  const selectedModel =
+    availableModels.find((item) => item.value === settings.ai?.model)?.value ||
+    availableModels[0].value;
+
+  const handleProviderChange = (provider) => {
+    const nextModels =
+      modelOptions.find((option) => option.provider === provider)?.items || modelOptions[0].items;
+    updateAi({
+      provider,
+      model: nextModels[0].value
+    });
+  };
 
   return (
     <div className="pt-2 pb-6 px-4 animate-in fade-in slide-in-from-top-4 duration-300 max-h-[620px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent" style={{ WebkitAppRegion: "no-drag" }}>
@@ -78,16 +128,10 @@ const NeuralCenter = ({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-xs text-gray-400 col-span-2">Fonte de entrada</label>
-            <select
-              value={settings.audio?.inputDevice || "both"}
-              onChange={(e) => updateAudio({ inputDevice: e.target.value })}
-              className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
-            >
-              {inputOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <label className="text-xs text-gray-400 col-span-2">Entrada ativa</label>
+            <div className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10">
+              Microfone manual (iniciar/parar no botao da barra)
+            </div>
 
             <label className="text-xs text-gray-400 col-span-2">Sensibilidade de silencio</label>
             <input
@@ -127,20 +171,22 @@ const NeuralCenter = ({
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-gray-400 col-span-2">Provider</label>
             <select
-              value={settings.ai?.provider || "gemini"}
-              onChange={(e) => updateAi({ provider: e.target.value })}
+              value={aiProvider}
+              onChange={(e) => handleProviderChange(e.target.value)}
               className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
             >
-              <option value="gemini">Gemini</option>
+              {providerOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
 
             <label className="text-xs text-gray-400 col-span-2">Modelo</label>
             <select
-              value={settings.ai?.model || "gemini-2.5-flash"}
+              value={selectedModel}
               onChange={(e) => updateAi({ model: e.target.value })}
               className="col-span-2 bg-black/40 text-gray-200 text-sm rounded-md px-3 py-2 border border-white/10 focus:outline-none"
             >
-              {modelOptions.map((opt) => (
+              {availableModels.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -199,14 +245,25 @@ const NeuralCenter = ({
           <div className="mt-4 flex items-center gap-2">
             <button
               onClick={handleClearMemory}
+              disabled={clearFeedback.status === "loading"}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs border transition-colors ${
                 confirmClear
                   ? "border-red-400 text-red-300 bg-red-500/10"
-                  : "border-white/10 text-gray-300 bg-black/40 hover:bg-white/10"
+                  : clearFeedback.status === "loading"
+                    ? "border-yellow-400/40 text-yellow-200 bg-yellow-500/10"
+                    : "border-white/10 text-gray-300 bg-black/40 hover:bg-white/10"
               }`}
             >
-              <FiTrash2 className="w-3 h-3" />
-              {confirmClear ? "Confirmar limpeza total" : "Limpar memoria (total)"}
+              {clearFeedback.status === "loading" ? (
+                <FiLoader className="w-3 h-3 animate-spin" />
+              ) : (
+                <FiTrash2 className="w-3 h-3" />
+              )}
+              {confirmClear
+                ? "Confirmar limpeza total"
+                : clearFeedback.status === "loading"
+                  ? "Limpando memoria..."
+                  : "Limpar memoria (total)"}
             </button>
 
             <button
@@ -217,6 +274,23 @@ const NeuralCenter = ({
               Reset settings
             </button>
           </div>
+
+          {clearFeedback.status !== "idle" && (
+            <div
+              className={`mt-3 text-xs flex items-center gap-2 ${
+                clearFeedback.status === "success"
+                  ? "text-green-300"
+                  : clearFeedback.status === "error"
+                    ? "text-red-300"
+                    : "text-yellow-200"
+              }`}
+            >
+              {clearFeedback.status === "success" && <FiCheckCircle className="w-3 h-3" />}
+              {clearFeedback.status === "error" && <FiAlertCircle className="w-3 h-3" />}
+              {clearFeedback.status === "loading" && <FiLoader className="w-3 h-3 animate-spin" />}
+              <span>{clearFeedback.message}</span>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -228,7 +302,8 @@ NeuralCenter.propTypes = {
   onUpdateSettings: PropTypes.func,
   onResetSettings: PropTypes.func,
   onClearMemory: PropTypes.func,
-  onMinimize: PropTypes.func
+  onMinimize: PropTypes.func,
+  fullScreen: PropTypes.bool
 };
 
 export default NeuralCenter;

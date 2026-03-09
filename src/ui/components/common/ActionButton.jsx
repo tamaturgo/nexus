@@ -6,7 +6,8 @@ const ActionButton = ({
   title,
   children,
   variant = 'default',
-  size = 'default'
+  size = 'default',
+  className = ''
 }) => {
   const baseClasses = "transition-all duration-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -28,7 +29,7 @@ const ActionButton = ({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
     >
       {children}
     </button>
@@ -41,7 +42,8 @@ ActionButton.propTypes = {
   title: PropTypes.string,
   children: PropTypes.node.isRequired,
   variant: PropTypes.oneOf(['default', 'primary', 'danger']),
-  size: PropTypes.oneOf(['small', 'default', 'large'])
+  size: PropTypes.oneOf(['small', 'default', 'large']),
+  className: PropTypes.string
 };
 
 export default ActionButton;
